@@ -119,8 +119,68 @@ go build -ldflags "-X '$MODULE_PATH.ServiceName=$SERVICE_NAME' \
 
 ## 🧪 Testing
 
+### Unit Tests
+
 Run unit tests for the library:
 
 ```bash
 go test -v ./...
 ```
+
+### End-to-End (E2E) Tests
+
+The library includes a comprehensive E2E test suite that verifies the complete observability stack
+in a real-world environment using Docker.
+
+**What is tested:**
+
+- ✅ **Distributed Tracing**: Traces are sent to OpenTelemetry Collector and viewable in Jaeger
+- ✅ **Metrics Collection**: Prometheus successfully scrapes metrics from the service
+- ✅ **Structured Logging**: JSON logs with trace context (trace_id, span_id)
+- ✅ **Integration**: Full stack integration (Service → OTEL Collector → Jaeger/Prometheus)
+
+**Prerequisites:**
+
+- Docker and Docker Compose
+- Go 1.21+
+- Available ports: 8081, 9092, 9099, 14318, 16687
+
+**Run E2E tests:**
+
+```bash
+cd e2e
+./run-e2e.sh
+```
+
+The test suite will:
+
+1. Start infrastructure (Jaeger, Prometheus, OTEL Collector) using Docker Compose
+2. Build and run the example service (`examples/simple-service`)
+3. Generate test traffic (5 HTTP requests)
+4. Verify traces appear in Jaeger
+5. Verify metrics are scraped by Prometheus
+6. Clean up all resources automatically
+
+**Architecture:**
+
+```
+┌─────────────────┐
+│ Simple Service  │ (Port 8081)
+│   /ping         │
+└────────┬────────┘
+         │ OTLP/HTTP
+         ▼
+┌─────────────────┐
+│ OTEL Collector  │ (Port 14318)
+└────┬────────┬───┘
+     │        │
+     │        └──────────────┐
+     │                       │
+     ▼                       ▼
+┌─────────┐          ┌─────────────┐
+│ Jaeger  │          │ Prometheus  │
+│ (16687) │          │   (9099)    │
+└─────────┘          └─────────────┘
+```
+
+For more details about the E2E test implementation, see [E2E.md](E2E.md).
