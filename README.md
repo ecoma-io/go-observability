@@ -155,7 +155,7 @@ cd e2e
 The test suite will:
 
 1. Start infrastructure (Jaeger, Prometheus, OTEL Collector) using Docker Compose
-2. Build and run the example service (`examples/simple-service`)
+2. Build and run the example service
 3. Generate test traffic (5 HTTP requests)
 4. Verify traces appear in Jaeger
 5. Verify metrics are scraped by Prometheus
