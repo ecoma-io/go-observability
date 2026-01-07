@@ -31,6 +31,9 @@ jobs:
             --redact \
             --exit-code=2
 
+      - name: Shellcheck
+        uses: ludeeus/action-shellcheck@master
+
       - name: Checking dprint formatting
         uses: dprint/check@v2.3
 
@@ -45,6 +48,9 @@ jobs:
 
       - name: Run integration tests
         run: go test -v ./...
+
+      - name: Run E2E tests
+        run: bash e2e/run-e2e.sh
 
   release:
     # Release job: runs only on push to main and creates a release via

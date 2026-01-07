@@ -1,0 +1,68 @@
+services:
+  simple-service:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+      args:
+        - VERSION=v1.0.0-e2e
+        - BUILD_TIME=${BUILD_TIME:-2026-01-07T00:00:00Z}
+        - SERVICE_NAME=simple-service-e2e
+    container_name: simple-service
+    ports:
+      - "8081:8080"
+      - "9092:9090"
+    environment:
+      - SERVICE_NAME=simple-service
+      - PORT=8080
+      - METRICS_PORT=9090
+      - OTEL_ENDPOINT=otel-collector:4318
+      - LOG_LEVEL=info
+    depends_on:
+      - otel-collector
+    networks:
+      - e2e-network
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel-config.yaml:/etc/otel/config.yaml
+    ports:
+      - "14317:4317" # OTLP gRPC
+      - "14318:4318" # OTLP HTTP
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - e2e-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9099:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    networks:
+      - e2e-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16687:16686" # UI
+      - "14268:14268"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - e2e-network
+
+networks:
+  e2e-network:
+    driver: bridge
