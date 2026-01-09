@@ -1,4 +1,4 @@
-module github.com/ecoma-io/observability
+module github.com/ecoma-io/go-observability
 
 go 1.25.5
 
