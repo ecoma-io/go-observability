@@ -5,7 +5,7 @@
     "**/*.{json,jsonc,md,yaml,yml,toml}"
   ],
   "excludes": [
-    "go.work.sum",
+    "**/*.pb.go",
     "go.sum",
     "CHANGELOG.md"
   ],
