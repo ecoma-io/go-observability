@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ecoma-io/observability"
+	"github.com/ecoma-io/go-observability"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -58,7 +58,7 @@ func main() {
 
 func pingHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	
+
 	// Create Span
 	tracer := observability.GetTracer("simple-service")
 	ctx, span := tracer.Start(ctx, "ping-handler")
@@ -70,18 +70,12 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Update Metrics
 	meter := observability.GetMeter("simple-service")
-	counter, _ := meter.Int64Counter("request_count", 
-		// description and unit are optional but good practice
-	)
+	counter, _ := meter.Int64Counter("request_count_total")
 	counter.Add(ctx, 1, metric.WithAttributes(attribute.String("endpoint", "/ping")))
 
-	// Log with Metadata (TraceID should be auto-injected if we use a context-aware logger, 
-	// but our basic Logger wrapper currently doesn't automatically extract it from Context 
-	// unless we enhance it. For now, we just log.)
-	// To link logs to traces manually in Zap:
-	// logging span_id and trace_id.
+	// Log with trace context
 	sc := span.SpanContext()
-	logger.Info("Ping received", 
+	logger.Info("Ping received",
 		"trace_id", sc.TraceID().String(),
 		"span_id", sc.SpanID().String(),
 		"latency_ms", ms,

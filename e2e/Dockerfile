@@ -1,41 +1,41 @@
 # Build stage
 FROM golang:alpine AS builder
 
-# Build arguments for version info (can be overridden at build time)
 ARG VERSION=dev
 ARG BUILD_TIME
 ARG SERVICE_NAME=simple-service
+ARG SERVICE_DIR=simple-service
 
 WORKDIR /workspace
 
-# Copy entire workspace (for local replace directive to work)
+# 1. Chỉ copy files định nghĩa dependency trước
+COPY go.mod go.sum ./
+# Nếu dự án có sử dụng 'replace' tới local modules, bạn cần copy cả go.mod của chúng
+# Ví dụ: COPY internal/pkg/go.mod ./internal/pkg/
+
+# 2. Download dependencies (Layer này sẽ được cached nếu go.mod/go.sum không đổi)
+RUN go mod download
+
+# 3. Copy toàn bộ source code sau khi đã download xong deps
 COPY . .
 
-# Build the simple-service with LDFlags
-WORKDIR /workspace/e2e
-RUN go mod download
+# 4. Sử dụng BuildKit Cache Mount để tăng tốc compile
+WORKDIR /workspace/examples/${SERVICE_DIR}
 ENV CGO_ENABLED=0
 ENV GOOS=linux
-RUN go build \
-    -ldflags="-X 'github.com/ecoma-io/observability.Version=${VERSION}' \
-              -X 'github.com/ecoma-io/observability.BuildTime=${BUILD_TIME}' \
-              -X 'github.com/ecoma-io/observability.ServiceName=${SERVICE_NAME}'" \
-    -o simple-service .
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    go build \
+    -ldflags="-X 'github.com/ecoma-io/go-observability.Version=${VERSION}' \
+              -X 'github.com/ecoma-io/go-observability.BuildTime=${BUILD_TIME}' \
+              -X 'github.com/ecoma-io/go-observability.ServiceName=${SERVICE_NAME}'" \
+    -o /app/service .
 
 # Runtime stage
-
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates
-
+FROM gcr.io/distroless/static-debian12:debug
 WORKDIR /app
-
-# Copy the binary from builder
-COPY --from=builder /workspace/e2e .
-
-# Expose ports
-EXPOSE 8080
-EXPOSE 9090
-
-# Run the service
-CMD ["./simple-service"]
+COPY --from=builder /app/service .
+EXPOSE 8080 9090
+ENTRYPOINT ["/app/service"]
+CMD []

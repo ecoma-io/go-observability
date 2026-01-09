@@ -6,7 +6,9 @@ pre-commit:
     golangci-lint:
       tags: backend style
       glob: "*.go"
-      run: golangci-lint run --fix {staged_files}
+      # Run golangci-lint on the module instead of passing staged files
+      # which can span multiple directories and cause "named files must all be in one directory" errors.
+      run: golangci-lint run --fix
     format:
       glob: "*.{json,md,yml,yaml,toml,sh}"
       run: dprint fmt {staged_files} --allow-no-files && git add {staged_files} && dprint check {staged_files} --allow-no-files
