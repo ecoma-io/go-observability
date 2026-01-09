@@ -90,6 +90,67 @@ counter, _ := meter.Int64Counter("stock_updates_total")
 counter.Add(ctx, 1)
 ```
 
+### 3. Gin Middleware Integration
+
+The library provides ready-to-use middleware for Gin framework with automatic logging, tracing, and
+panic recovery:
+
+```go
+package main
+
+import (
+    "github.com/gin-gonic/gin"
+    "github.com/ecoma-io/go-observability"
+)
+
+func main() {
+    // ... initialize config, logger, otel ...
+
+    router := gin.Default()
+
+    // Apply all observability middleware (recommended)
+    for _, mw := range observability.GinMiddleware(logger) {
+        router.Use(mw)
+    }
+
+    // Or apply individually:
+    // router.Use(observability.GinRecovery(logger))  // Panic recovery
+    // router.Use(observability.GinLogger(logger))     // Request logging
+
+    router.GET("/ping", func(c *gin.Context) {
+        c.JSON(200, gin.H{"message": "pong"})
+    })
+
+    router.Run(":8080")
+}
+```
+
+**Features:**
+
+- ✅ Automatic request/response logging with trace context
+- ✅ Panic recovery with structured error responses
+- ✅ Trace ID propagation in responses
+- ✅ Status-based log levels (info/warn/error)
+
+**Example Log Output:**
+
+```json
+{
+  "level": "info",
+  "timestamp": "2026-01-09T05:30:00.123Z",
+  "msg": "HTTP Request",
+  "service": "my-service",
+  "status": 200,
+  "method": "GET",
+  "path": "/api/users",
+  "latency_ms": 15,
+  "trace_id": "a1b2c3d4e5f6...",
+  "span_id": "1234567890ab..."
+}
+```
+
+See [examples/gin-example](examples/gin-example) for a complete working example.
+
 ## 🏗 Build with LDFlags (Recommended)
 
 To make full use of version management, use `-ldflags` to inject information into the binary at
