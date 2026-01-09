@@ -6,10 +6,10 @@ scrape_configs:
     static_configs:
       - targets: ["host.docker.internal:9092"]
 
-  # Scrape App directly (Pull model if we configured that way)
-  # But our library creates a server at METRICS_PORT.
-  # Since app runs on host, and Prometheus in Docker,
-  # Prometheus needs to reach 'host.docker.internal' (Mac/Windows) or Host IP (Linux).
-  # For E2E simplicity, we verify Metrics arrived at Otel-Collector's Prom Exporter
-  # OR we can scrape the app directly if we use host networking or correct IP.
-  # Let's try to scrape the Otel Collector's exporter which bridges the gap.
+  - job_name: "gin-service"
+    static_configs:
+      - targets: ["host.docker.internal:9093"]
+
+  - job_name: "grpc-service"
+    static_configs:
+      - targets: ["host.docker.internal:9094"]

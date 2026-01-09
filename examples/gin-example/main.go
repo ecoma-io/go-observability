@@ -40,8 +40,8 @@ func main() {
 	// 5. Setup Gin with observability middleware
 	router := gin.New()
 
-	// Apply middleware: Recovery first, then Logger
-	for _, mw := range observability.GinMiddleware(logger) {
+	// Apply middleware: Tracing, Recovery, then Logger
+	for _, mw := range observability.GinMiddleware(logger, cfg.ServiceName) {
 		router.Use(mw)
 	}
 

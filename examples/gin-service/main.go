@@ -1,17 +1,17 @@
 package main
 
 import (
-"context"
-"fmt"
-"math/rand"
-"net/http"
-"time"
+	"context"
+	"fmt"
+	"math/rand"
+	"net/http"
+	"time"
 
-"github.com/ecoma-io/go-observability"
-"github.com/gin-gonic/gin"
-"go.opentelemetry.io/otel"
-"go.opentelemetry.io/otel/attribute"
-"go.opentelemetry.io/otel/metric"
+	"github.com/ecoma-io/go-observability"
+	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
 
 type Config struct {
@@ -52,7 +52,7 @@ func main() {
 	router := gin.New()
 
 	// Apply observability middleware
-	for _, mw := range observability.GinMiddleware(logger) {
+	for _, mw := range observability.GinMiddleware(logger, cfg.ServiceName) {
 		router.Use(mw)
 	}
 

@@ -129,7 +129,7 @@ go run main.go
 
 ```go
 // Apply middleware to Gin router
-for _, mw := range observability.GinMiddleware(logger) {
+for _, mw := range observability.GinMiddleware(logger, cfg.ServiceName) {
     router.Use(mw)
 }
 

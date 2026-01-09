@@ -15,6 +15,9 @@ SIMPLE_APP_PORT=8081
 SIMPLE_METRICS_PORT=9092
 GIN_APP_PORT=8082
 GIN_METRICS_PORT=9093
+GRPC_APP_PORT=50051
+GRPC_HEALTH_PORT=8083
+GRPC_METRICS_PORT=9094
 PROM_PORT=9099
 JAEGER_PORT=16687
 
@@ -58,6 +61,7 @@ docker compose up -d --build
 # Wait for services to be ready instead of fixed sleep
 wait_for_http "http://localhost:$SIMPLE_APP_PORT/ping" "simple-service" 20
 wait_for_http "http://localhost:$GIN_APP_PORT/ping" "gin-service" 20
+wait_for_http "http://localhost:$GRPC_HEALTH_PORT/health" "grpc-service" 20
 wait_for_http "http://localhost:$JAEGER_PORT/" "jaeger" 15
 
 # 2. Generate Load
@@ -90,6 +94,27 @@ if echo "$PANIC_RESPONSE" | grep -q "error.*Internal Server Error"; then
 else
    echo -e "${RED}FAILURE: Panic recovery failed${NC}"
    echo "Response: $PANIC_RESPONSE"
+fi
+
+# Test gRPC service
+echo "Testing grpc-service..."
+if command -v grpcurl &> /dev/null; then
+   # Test unary RPC
+   for _ in {1..3}; do
+      grpcurl -plaintext -d '{"name": "World"}' localhost:$GRPC_APP_PORT hello.HelloService/SayHello > /dev/null 2>&1 &
+   done
+   wait || true  # Don't fail if background jobs exit with non-zero
+   
+   # Test streaming RPC
+   grpcurl -plaintext -d '{"name": "Stream"}' localhost:$GRPC_APP_PORT hello.HelloService/SayHelloStream > /dev/null 2>&1 &
+   
+   # Test panic recovery
+   grpcurl -plaintext -d '{"name": "panic"}' localhost:$GRPC_APP_PORT hello.HelloService/SayHello > /dev/null 2>&1 || true
+   wait || true
+   
+   echo -e "${GREEN}SUCCESS: gRPC requests sent${NC}"
+else
+   echo "Note: grpcurl not installed, skipping gRPC direct calls (will still check traces/metrics)"
 fi
 
 # 3. Verify Observability
@@ -159,6 +184,18 @@ else
    FAILURE=true
 fi
 
+# Check Jaeger for grpc-service traces
+echo "Checking Jaeger for grpc-service traces..."
+JAEGER_GRPC_RESPONSE=$(curl -s "http://localhost:$JAEGER_PORT/api/traces?service=grpc-service")
+
+if [[ $JAEGER_GRPC_RESPONSE == *"traceID"* ]]; then
+   echo -e "${GREEN}SUCCESS: grpc-service traces found in Jaeger!${NC}"
+else
+   echo -e "${RED}FAILURE: No grpc-service traces found in Jaeger.${NC}"
+   echo "Response snippet: ${JAEGER_GRPC_RESPONSE:0:100}..."
+   FAILURE=true
+fi
+
 # Check Prometheus (looking for 'request_count_total')
 # Prometheus API: /api/v1/query?query=request_count_total
 echo "Checking Prometheus for simple-service metrics..."
@@ -192,6 +229,24 @@ else
    else
       echo -e "${RED}FAILURE: gin-service metrics verification failed.${NC}"
       echo "Response snippet: ${PROM_GIN_RESPONSE:0:200}..."
+      FAILURE=true
+   fi
+fi
+
+# Check Prometheus for grpc-service metrics
+echo "Checking Prometheus for grpc-service metrics..."
+PROM_GRPC_RESPONSE=$(curl -s "http://localhost:$PROM_PORT/api/v1/query?query=grpc_request_count_total")
+
+if [[ $PROM_GRPC_RESPONSE == *"success"* ]] && [[ $PROM_GRPC_RESPONSE == *"grpc"* ]]; then
+   echo -e "${GREEN}SUCCESS: grpc-service metrics found in Prometheus!${NC}"
+else
+   # Fallback: check metrics endpoint directly
+   DIRECT_GRPC_METRICS=$(curl -s "http://localhost:$GRPC_METRICS_PORT/metrics" | grep -c "grpc_request_count_total")
+   if [[ "$DIRECT_GRPC_METRICS" -gt 0 ]]; then
+      echo -e "${GREEN}SUCCESS: grpc-service metrics available (not yet in Prometheus, but endpoint works)${NC}"
+   else
+      echo -e "${RED}FAILURE: grpc-service metrics verification failed.${NC}"
+      echo "Response snippet: ${PROM_GRPC_RESPONSE:0:200}..."
       FAILURE=true
    fi
 fi

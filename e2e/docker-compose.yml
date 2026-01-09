@@ -47,6 +47,32 @@ services:
     networks:
       - e2e-network
 
+  grpc-service:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+      args:
+        - VERSION=v1.0.0-e2e-grpc
+        - BUILD_TIME=${BUILD_TIME:-2026-01-07T00:00:00Z}
+        - SERVICE_NAME=grpc-service-e2e
+        - SERVICE_DIR=grpc-service
+    container_name: grpc-service
+    ports:
+      - "50051:50051"
+      - "8083:8080"
+      - "9094:9090"
+    environment:
+      - SERVICE_NAME=grpc-service
+      - PORT=50051
+      - HEALTH_PORT=8080
+      - METRICS_PORT=9090
+      - OTEL_ENDPOINT=otel-collector:4318
+      - LOG_LEVEL=info
+    depends_on:
+      - otel-collector
+    networks:
+      - e2e-network
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: otel-collector

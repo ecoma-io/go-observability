@@ -207,7 +207,7 @@ func TestGinMiddleware(t *testing.T) {
 
 	router := gin.New()
 	// Apply both middleware using GinMiddleware helper
-	for _, mw := range GinMiddleware(logger) {
+	for _, mw := range GinMiddleware(logger, cfg.ServiceName) {
 		router.Use(mw)
 	}
 

@@ -24,6 +24,9 @@ A standardized library for Golang microservices at **Ecoma-io**, providing built
 - **Distributed Tracing**: OpenTelemetry Tracing integration via OTLP/HTTP.
 - **Metrics**: Collect and expose system metrics using Prometheus (Pull model).
 - **Build-time Metadata**: Support for injecting Version and Build Time from CI/CD.
+- **Gin Middleware**: Ready-to-use middleware for Gin framework with logging, tracing, and panic
+  recovery.
+- **gRPC Interceptors**: Unary and streaming interceptors for gRPC servers with full observability.
 
 ---
 
@@ -92,7 +95,7 @@ counter.Add(ctx, 1)
 
 ### 3. Gin Middleware Integration
 
-The library provides ready-to-use middleware for Gin framework with automatic logging, tracing, and
+The library provides ready-to-use middleware for Gin framework with automatic tracing, logging, and
 panic recovery:
 
 ```go
@@ -109,13 +112,14 @@ func main() {
     router := gin.Default()
 
     // Apply all observability middleware (recommended)
-    for _, mw := range observability.GinMiddleware(logger) {
+    for _, mw := range observability.GinMiddleware(logger, cfg.ServiceName) {
         router.Use(mw)
     }
 
     // Or apply individually:
-    // router.Use(observability.GinRecovery(logger))  // Panic recovery
-    // router.Use(observability.GinLogger(logger))     // Request logging
+    // router.Use(observability.GinTracing(cfg.ServiceName)) // Create tracing spans
+    // router.Use(observability.GinRecovery(logger))          // Panic recovery
+    // router.Use(observability.GinLogger(logger))            // Request logging
 
     router.GET("/ping", func(c *gin.Context) {
         c.JSON(200, gin.H{"message": "pong"})
@@ -127,9 +131,11 @@ func main() {
 
 **Features:**
 
-- ✅ Automatic request/response logging with trace context
+- ✅ Automatic tracing span creation for each HTTP request
+- ✅ W3C Trace Context propagation (extract from headers, inject into response)
+- ✅ Request/response logging with trace context
 - ✅ Panic recovery with structured error responses
-- ✅ Trace ID propagation in responses
+- ✅ Trace ID in response headers (X-Trace-ID) and error responses
 - ✅ Status-based log levels (info/warn/error)
 
 **Example Log Output:**
@@ -150,6 +156,91 @@ func main() {
 ```
 
 See [examples/gin-example](examples/gin-example) for a complete working example.
+
+### 4. gRPC Interceptors Integration
+
+The library provides ready-to-use interceptors for gRPC servers with automatic logging, tracing, and
+panic recovery:
+
+```go
+package main
+
+import (
+    "net"
+    "github.com/ecoma-io/go-observability"
+    "google.golang.org/grpc"
+)
+
+func main() {
+    // ... initialize config, logger, otel ...
+
+    // Create gRPC server with observability interceptors
+    server := grpc.NewServer(
+        grpc.ChainUnaryInterceptor(
+            observability.GrpcUnaryInterceptors(logger)...,
+        ),
+        grpc.ChainStreamInterceptor(
+            observability.GrpcStreamInterceptors(logger)...,
+        ),
+    )
+
+    // Or apply individually:
+    // grpc.NewServer(
+    //     grpc.UnaryInterceptor(observability.GrpcUnaryRecoveryInterceptor(logger)),
+    //     grpc.UnaryInterceptor(observability.GrpcUnaryServerInterceptor(logger)),
+    //     grpc.StreamInterceptor(observability.GrpcStreamRecoveryInterceptor(logger)),
+    //     grpc.StreamInterceptor(observability.GrpcStreamServerInterceptor(logger)),
+    // )
+
+    // Register your gRPC services
+    // pb.RegisterYourServiceServer(server, &yourServiceImpl{})
+
+    lis, _ := net.Listen("tcp", ":50051")
+    server.Serve(lis)
+}
+```
+
+**Features:**
+
+- ✅ Automatic request/response logging for unary and streaming RPCs
+- ✅ Panic recovery with gRPC status errors
+- ✅ Trace ID propagation in response metadata
+- ✅ Status-based log levels (info/warn/error)
+- ✅ Support for both unary and streaming interceptors
+
+**Example Log Output (Unary RPC):**
+
+```json
+{
+  "level": "info",
+  "timestamp": "2026-01-09T08:30:00.123Z",
+  "msg": "gRPC Request",
+  "service": "my-grpc-service",
+  "method": "/pb.UserService/GetUser",
+  "grpc_code": "OK",
+  "latency_ms": 25,
+  "trace_id": "a1b2c3d4e5f6...",
+  "span_id": "1234567890ab..."
+}
+```
+
+**Example Log Output (Stream RPC):**
+
+```json
+{
+  "level": "info",
+  "timestamp": "2026-01-09T08:30:00.456Z",
+  "msg": "gRPC Stream Request",
+  "service": "my-grpc-service",
+  "method": "/pb.ChatService/StreamMessages",
+  "grpc_code": "OK",
+  "latency_ms": 5000,
+  "is_client_stream": true,
+  "is_server_stream": true,
+  "trace_id": "a1b2c3d4e5f6...",
+  "span_id": "1234567890ab..."
+}
+```
 
 ## 🏗 Build with LDFlags (Recommended)
 

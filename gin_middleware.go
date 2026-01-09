@@ -7,8 +7,38 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// GinTracing middleware creates OpenTelemetry spans for HTTP requests
+func GinTracing(serviceName string) gin.HandlerFunc {
+	tracer := otel.Tracer("gin-server")
+	propagator := otel.GetTextMapPropagator()
+
+	return func(c *gin.Context) {
+		// Extract trace context from incoming headers (W3C Trace Context)
+		ctx := propagator.Extract(c.Request.Context(), propagation.HeaderCarrier(c.Request.Header))
+
+		// Create a span for this request
+		ctx, span := tracer.Start(ctx, c.Request.Method+" "+c.Request.URL.Path,
+			trace.WithSpanKind(trace.SpanKindServer),
+		)
+		defer span.End()
+
+		// Store the context with span for downstream use
+		c.Request = c.Request.WithContext(ctx)
+
+		// Inject trace_id into response header for client tracking
+		spanContext := span.SpanContext()
+		if spanContext.HasTraceID() {
+			c.Header("X-Trace-ID", spanContext.TraceID().String())
+		}
+
+		c.Next()
+	}
+}
 
 // GinLogger middleware logs HTTP requests with OpenTelemetry trace context
 func GinLogger(logger *Logger) gin.HandlerFunc {
@@ -120,10 +150,11 @@ func GinRecovery(logger *Logger) gin.HandlerFunc {
 	}
 }
 
-// GinMiddleware combines both logging and recovery middleware
-// Usage: router.Use(observability.GinMiddleware(logger))
-func GinMiddleware(logger *Logger) []gin.HandlerFunc {
+// GinMiddleware combines tracing, recovery, and logging middleware
+// Usage: router.Use(observability.GinMiddleware(logger, "service-name")...)
+func GinMiddleware(logger *Logger, serviceName string) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
+		GinTracing(serviceName),
 		GinRecovery(logger),
 		GinLogger(logger),
 	}
