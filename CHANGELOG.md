@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/ecoma-io/go-observability/compare/v1.1.0...v1.2.0) (2026-01-09)
+
+
+### Features
+
+* add GinTracing middleware for OpenTelemetry support ([82c0257](https://github.com/ecoma-io/go-observability/commit/82c0257864ab713ba165a6d8b2eaa4ecd32ab6d0))
+
 ## [1.1.0](https://github.com/ecoma-io/go-observability/compare/v1.0.0...v1.1.0) (2026-01-09)
 
 
