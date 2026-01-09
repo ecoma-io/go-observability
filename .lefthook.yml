@@ -13,6 +13,8 @@ pre-commit:
     shellcheck:
       glob: "*.{sh,bash}"
       run: shellcheck {staged_files}
+    test:
+      run: go test ./...
 
 commit-msg:
   commands:
@@ -22,4 +24,6 @@ commit-msg:
 pre-push:
   commands:
     test:
-      run: echo "@TODO Need to implement tests before pushing!"
+      run: go test ./...
+    e2e:
+      run: bash e2e/run-e2e.sh
