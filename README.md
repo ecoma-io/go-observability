@@ -30,7 +30,7 @@ A standardized library for Golang microservices at **Ecoma-io**, providing built
 ## 📦 Installation
 
 ```bash
-go get github.com/ecoma-io/observability
+go get github.com/ecoma-io/go-observability
 ```
 
 ## 🛠 Usage
@@ -44,7 +44,7 @@ package main
 
 import (
     "context"
-    "github.com/ecoma-io/observability"
+    "github.com/ecoma-io/go-observability"
 )
 
 func main() {
@@ -99,7 +99,7 @@ build time:
 SERVICE_NAME="order-service"
 VERSION="v1.2.3"
 BUILD_TIME=$(date +%FT%T%z)
-MODULE_PATH="github.com/ecoma-io/observability"
+MODULE_PATH="github.com/ecoma-io/go-observability"
 
 go build -ldflags "-X '$MODULE_PATH.ServiceName=$SERVICE_NAME' \
                    -X '$MODULE_PATH.Version=$VERSION' \
@@ -142,7 +142,7 @@ in a real-world environment using Docker.
 **Prerequisites:**
 
 - Docker and Docker Compose
-- Go 1.21+
+- Go 1.25+
 - Available ports: 8081, 9092, 9099, 14318, 16687
 
 **Run E2E tests:**
