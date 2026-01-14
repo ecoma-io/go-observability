@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Go Observability icon">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0%" stop-color="#3f51b5" />
+      <stop offset="100%" stop-color="#536dfe" />
+    </linearGradient>
+    <radialGradient id="p" cx="50%" cy="45%" r="40%">
+      <stop offset="0%" stop-color="#0b1226" />
+      <stop offset="100%" stop-color="#15233f" />
+    </radialGradient>
+    <style>
+      .bg { fill: url(#g); }
+      .eye { fill: #ffffff; opacity: 0.98; }
+      .pupil { fill: url(#p); }
+      .trace { fill: none; stroke: rgba(255,255,255,0.95); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+      .bar { fill: rgba(255,255,255,0.95); rx: 6; }
+      .dot { fill: rgba(255,255,255,0.98); }
+    </style>
+  </defs>
+
+  <!-- Rounded gradient badge -->
+  <rect x="8" y="8" width="496" height="496" rx="64" class="bg" />
+
+  <!-- Eye shape (white) -->
+  <g transform="translate(0, -6)">
+    <path class="eye" d="M86 256 C86 156 426 156 426 256 C426 356 86 356 86 256 Z" />
+    <!-- Pupil -->
+    <circle class="pupil" cx="256" cy="256" r="48" />
+    <!-- Inner glint -->
+    <circle class="dot" cx="230" cy="238" r="8" opacity="0.9" />
+  </g>
+
+  <!-- Trace line with nodes (represents distributed traces) -->
+  <path class="trace" d="M120 340 C180 300 240 300 296 320 C352 340 420 300 420 260" />
+  <circle class="dot" cx="140" cy="332" r="8" />
+  <circle class="dot" cx="256" cy="320" r="8" />
+  <circle class="dot" cx="392" cy="276" r="8" />
+
+  <!-- Metric bars (represents metrics) -->
+  <g transform="translate(-6,0)">
+    <rect x="360" y="116" width="22" height="64" rx="6" class="bar" opacity="0.9" />
+    <rect x="394" y="96" width="22" height="96" rx="6" class="bar" opacity="0.95" />
+    <rect x="428" y="140" width="22" height="52" rx="6" class="bar" opacity="0.88" />
+  </g>
+
+  <!-- Subtle outer ring for emphasis -->
+  <circle cx="256" cy="256" r="244" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="16" />
+</svg>
