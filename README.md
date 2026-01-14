@@ -429,6 +429,212 @@ METRICS_PUSH_INTERVAL=30
 - ✅ Redundancy in metrics collection
 - ✅ Gradual migration path from pull to push
 
+### Native OTLP Metric Export
+
+The library provides native support for OTLP (OpenTelemetry Line Protocol) metric export via both
+**HTTP** and **gRPC** protocols, enabling seamless integration with OpenTelemetry Collectors and
+modern observability platforms.
+
+#### Protocol Selection
+
+Configure the protocol used for OTLP metric export using the `METRICS_PROTOCOL` environment
+variable:
+
+```bash
+# HTTP Protocol (default, recommended for compatibility)
+METRICS_PROTOCOL=http
+METRICS_PUSH_ENDPOINT=localhost:4318
+
+# gRPC Protocol (lower latency, more efficient)
+METRICS_PROTOCOL=grpc
+METRICS_PUSH_ENDPOINT=localhost:4317
+```
+
+**Protocol Comparison:**
+
+| Feature           | HTTP   | gRPC                 |
+| ----------------- | ------ | -------------------- |
+| Default Port      | 4318   | 4317                 |
+| Overhead          | Higher | Lower                |
+| Latency           | Higher | Lower                |
+| Compatibility     | Wider  | OTLP native          |
+| Firewall Friendly | Yes    | No (custom protocol) |
+
+#### HTTP Protocol Configuration
+
+**Example with HTTP (Default):**
+
+```bash
+# Environment variables
+METRICS_MODE=push
+METRICS_PROTOCOL=http
+METRICS_PUSH_ENDPOINT=otel-collector:4318
+METRICS_PUSH_INTERVAL=30
+```
+
+**Code Example:**
+
+```go
+package main
+
+import (
+    "context"
+    "github.com/ecoma-io/go-observability"
+)
+
+func main() {
+    cfg := observability.BaseConfig{
+        ServiceName:           "my-service",
+        MetricsMode:           "push",
+        MetricsProtocol:       "http",  // HTTP Protocol
+        MetricsPushEndpoint:   "otel-collector:4318",
+        MetricsPushInterval:   30,
+    }
+
+    shutdown, err := observability.InitOtel(cfg)
+    if err != nil {
+        panic(err)
+    }
+    defer shutdown(context.Background())
+
+    // Your service code...
+}
+```
+
+#### gRPC Protocol Configuration
+
+**Example with gRPC:**
+
+```bash
+# Environment variables
+METRICS_MODE=push
+METRICS_PROTOCOL=grpc
+METRICS_PUSH_ENDPOINT=otel-collector:4317
+METRICS_PUSH_INTERVAL=30
+```
+
+**Code Example:**
+
+```go
+package main
+
+import (
+    "context"
+    "github.com/ecoma-io/go-observability"
+)
+
+func main() {
+    cfg := observability.BaseConfig{
+        ServiceName:           "my-service",
+        MetricsMode:           "push",
+        MetricsProtocol:       "grpc",  // gRPC Protocol
+        MetricsPushEndpoint:   "otel-collector:4317",
+        MetricsPushInterval:   30,
+    }
+
+    shutdown, err := observability.InitOtel(cfg)
+    if err != nil {
+        panic(err)
+    }
+    defer shutdown(context.Background())
+
+    // Your service code...
+}
+```
+
+#### OpenTelemetry Collector Configuration
+
+**docker-compose.yml:**
+
+```yaml
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+    volumes:
+      - ./otel-config.yaml:/etc/otel/config.yaml
+    command: ["--config=/etc/otel/config.yaml"]
+```
+
+**otel-config.yaml:**
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  # Export to Prometheus
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+
+  # Export to Datadog (example)
+  datadog:
+    api:
+      key: "${DD_API_KEY}"
+      site: "datadoghq.com"
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: []
+      exporters: [prometheus, datadog]
+```
+
+#### ForceFlush for Short-Lived Jobs
+
+The library implements **ForceFlush** in the shutdown sequence to ensure all metrics are sent before
+the service terminates. This is especially important for batch jobs and Lambda/Serverless functions.
+
+**Shutdown Process:**
+
+```go
+shutdown, err := observability.InitOtel(cfg)
+if err != nil {
+    panic(err)
+}
+
+// Your service code...
+
+// On graceful shutdown, ForceFlush is called automatically
+ctx := context.Background()
+defer shutdown(ctx)  // Calls ForceFlush on MeterProvider and TracerProvider
+```
+
+**What ForceFlush does:**
+
+1. ✅ Flushes all in-flight metrics to the OTLP collector
+2. ✅ Flushes all in-flight traces
+3. ✅ Ensures no data loss on service termination
+4. ✅ Waits with a reasonable timeout (configured context)
+
+**Example with Timeout:**
+
+```go
+// Graceful shutdown with 5 second timeout
+shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+if err := shutdown(shutdownCtx); err != nil {
+    logger.Error("Shutdown error", "error", err)
+}
+```
+
+#### Backward Compatibility
+
+The library maintains **full backward compatibility**:
+
+- Existing configurations continue to work without changes
+- Default protocol is HTTP for maximum compatibility
+- Pull mode and Prometheus users are unaffected
+- All existing metrics modes (pull, push, hybrid) continue to work
+
 ### Helper Methods
 
 The `BaseConfig` struct provides helper methods to check metrics mode:
