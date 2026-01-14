@@ -12,12 +12,53 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// ObservabilityMiddlewareConfig holds configuration for observability middleware
+type ObservabilityMiddlewareConfig struct {
+	// ExcludedPaths is a list of paths to exclude from observability tracking
+	ExcludedPaths []string
+	// SkipRoute is a custom predicate function to determine if a route should be skipped
+	// If both ExcludedPaths and SkipRoute are set, SkipRoute takes precedence
+	SkipRoute func(path string) bool
+}
+
+// shouldSkipRoute checks if a path should be skipped based on configuration
+func (c *ObservabilityMiddlewareConfig) shouldSkipRoute(path string) bool {
+	if c == nil {
+		return false
+	}
+
+	// Custom predicate takes precedence
+	if c.SkipRoute != nil {
+		return c.SkipRoute(path)
+	}
+
+	// Check excluded paths
+	for _, excluded := range c.ExcludedPaths {
+		if path == excluded {
+			return true
+		}
+	}
+
+	return false
+}
+
 // GinTracing middleware creates OpenTelemetry spans for HTTP requests
 func GinTracing(serviceName string) gin.HandlerFunc {
+	return GinTracingWithConfig(serviceName, nil)
+}
+
+// GinTracingWithConfig middleware creates OpenTelemetry spans for HTTP requests with skip configuration
+func GinTracingWithConfig(serviceName string, cfg *ObservabilityMiddlewareConfig) gin.HandlerFunc {
 	tracer := otel.Tracer("gin-server")
 	propagator := otel.GetTextMapPropagator()
 
 	return func(c *gin.Context) {
+		// Check if this path should be skipped
+		if cfg.shouldSkipRoute(c.Request.URL.Path) {
+			c.Next()
+			return
+		}
+
 		// Extract trace context from incoming headers (W3C Trace Context)
 		ctx := propagator.Extract(c.Request.Context(), propagation.HeaderCarrier(c.Request.Header))
 
@@ -42,7 +83,18 @@ func GinTracing(serviceName string) gin.HandlerFunc {
 
 // GinLogger middleware logs HTTP requests with OpenTelemetry trace context
 func GinLogger(logger *Logger) gin.HandlerFunc {
+	return GinLoggerWithConfig(logger, nil)
+}
+
+// GinLoggerWithConfig middleware logs HTTP requests with OpenTelemetry trace context and skip configuration
+func GinLoggerWithConfig(logger *Logger, cfg *ObservabilityMiddlewareConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Check if this path should be skipped
+		if cfg.shouldSkipRoute(c.Request.URL.Path) {
+			c.Next()
+			return
+		}
+
 		start := time.Now()
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
@@ -109,9 +161,20 @@ type ErrorResponse struct {
 
 // GinRecovery middleware recovers from panics and returns structured error responses
 func GinRecovery(logger *Logger) gin.HandlerFunc {
+	return GinRecoveryWithConfig(logger, nil)
+}
+
+// GinRecoveryWithConfig middleware recovers from panics and returns structured error responses with skip configuration
+func GinRecoveryWithConfig(logger *Logger, cfg *ObservabilityMiddlewareConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
+				// Check if this path should be skipped
+				if cfg.shouldSkipRoute(c.Request.URL.Path) {
+					// Re-panic for other error handlers to catch
+					panic(err)
+				}
+
 				// Extract trace context
 				span := trace.SpanFromContext(c.Request.Context())
 				spanContext := span.SpanContext()
@@ -153,9 +216,15 @@ func GinRecovery(logger *Logger) gin.HandlerFunc {
 // GinMiddleware combines tracing, recovery, and logging middleware
 // Usage: router.Use(observability.GinMiddleware(logger, "service-name")...)
 func GinMiddleware(logger *Logger, serviceName string) []gin.HandlerFunc {
+	return GinMiddlewareWithConfig(logger, serviceName, nil)
+}
+
+// GinMiddlewareWithConfig combines tracing, recovery, and logging middleware with skip configuration
+// Usage: router.Use(observability.GinMiddlewareWithConfig(logger, "service-name", cfg)...)
+func GinMiddlewareWithConfig(logger *Logger, serviceName string, cfg *ObservabilityMiddlewareConfig) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
-		GinTracing(serviceName),
-		GinRecovery(logger),
-		GinLogger(logger),
+		GinTracingWithConfig(serviceName, cfg),
+		GinRecoveryWithConfig(logger, cfg),
+		GinLoggerWithConfig(logger, cfg),
 	}
 }

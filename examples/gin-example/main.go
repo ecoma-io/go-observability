@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ecoma-io/go-observability"
@@ -40,16 +41,54 @@ func main() {
 	// 5. Setup Gin with observability middleware
 	router := gin.New()
 
-	// Apply middleware: Tracing, Recovery, then Logger
-	for _, mw := range observability.GinMiddleware(logger, cfg.ServiceName) {
+	// Create middleware config to skip health and metrics endpoints
+	middlewareConfig := &observability.ObservabilityMiddlewareConfig{
+		SkipRoute: func(path string) bool {
+			// Skip health checks and metrics endpoints
+			return strings.HasPrefix(path, "/health") ||
+				strings.HasPrefix(path, "/metrics") ||
+				path == "/status"
+		},
+	}
+
+	// Apply middleware with skip configuration: Tracing, Recovery, then Logger
+	for _, mw := range observability.GinMiddlewareWithConfig(logger, cfg.ServiceName, middlewareConfig) {
 		router.Use(mw)
 	}
+
+	// Alternative: use ExcludedPaths instead of SkipRoute predicate
+	// middlewareConfig := &observability.ObservabilityMiddlewareConfig{
+	//     ExcludedPaths: []string{"/health", "/metrics", "/status"},
+	// }
 
 	// Alternative: apply middleware individually
 	// router.Use(observability.GinRecovery(logger))
 	// router.Use(observability.GinLogger(logger))
 
 	// 6. Define routes
+
+	// Health check endpoint (skipped from observability)
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "healthy",
+		})
+	})
+
+	// Metrics endpoint (skipped from observability)
+	router.GET("/metrics", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "metrics endpoint",
+		})
+	})
+
+	// Status endpoint (skipped from observability)
+	router.GET("/status", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ok",
+		})
+	})
+
+	// Ping endpoint (tracked in observability)
 	router.GET("/ping", func(c *gin.Context) {
 		// Create a span for this operation
 		tracer := otel.Tracer("api-handler")
@@ -69,6 +108,7 @@ func main() {
 		c.Request = c.Request.WithContext(ctx)
 	})
 
+	// Users endpoint (tracked in observability)
 	router.GET("/users/:id", func(c *gin.Context) {
 		userID := c.Param("id")
 
@@ -88,13 +128,13 @@ func main() {
 		})
 	})
 
-	// Example route that triggers an error
+	// Example route that triggers an error (tracked in observability)
 	router.GET("/error", func(c *gin.Context) {
 		// This will be caught by GinRecovery middleware
 		panic("something went wrong!")
 	})
 
-	// Example route with client error
+	// Example route with client error (tracked in observability)
 	router.GET("/not-found", func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Resource not found",
