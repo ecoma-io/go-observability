@@ -9,6 +9,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/prometheus"
@@ -86,21 +87,47 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 	}
 
 	if cfg.IsPush() {
-		// Push mode: OTLP metrics exporter
+		// Push mode: OTLP metrics exporter with protocol support (HTTP or gRPC)
 		pushInterval := time.Duration(cfg.MetricsPushInterval) * time.Second
-		otlpMetricsExp, err := otlpmetrichttp.New(ctx,
-			otlpmetrichttp.WithEndpoint(cfg.MetricsPushEndpoint),
-			otlpmetrichttp.WithInsecure(),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create OTLP metrics exporter: %w", err)
+		
+		// Create OTLP metric exporter based on protocol configuration
+		protocol := strings.ToLower(strings.TrimSpace(cfg.MetricsProtocol))
+		
+		switch protocol {
+		case "grpc":
+			// Use gRPC protocol for OTLP metrics export
+			exp, err := otlpmetricgrpc.New(ctx,
+				otlpmetricgrpc.WithEndpoint(cfg.MetricsPushEndpoint),
+				otlpmetricgrpc.WithInsecure(),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create OTLP gRPC metrics exporter: %w", err)
+			}
+			
+			reader := sdkmetric.NewPeriodicReader(exp,
+				sdkmetric.WithInterval(pushInterval),
+			)
+			metricsShutdown = append(metricsShutdown, reader.Shutdown)
+			readers = append(readers, reader)
+		case "http":
+			// Use HTTP protocol for OTLP metrics export
+			fallthrough
+		default:
+			// Default to HTTP if protocol not specified
+			exp, err := otlpmetrichttp.New(ctx,
+				otlpmetrichttp.WithEndpoint(cfg.MetricsPushEndpoint),
+				otlpmetrichttp.WithInsecure(),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create OTLP HTTP metrics exporter: %w", err)
+			}
+			
+			reader := sdkmetric.NewPeriodicReader(exp,
+				sdkmetric.WithInterval(pushInterval),
+			)
+			metricsShutdown = append(metricsShutdown, reader.Shutdown)
+			readers = append(readers, reader)
 		}
-
-		reader := sdkmetric.NewPeriodicReader(otlpMetricsExp,
-			sdkmetric.WithInterval(pushInterval),
-		)
-		metricsShutdown = append(metricsShutdown, reader.Shutdown)
-		readers = append(readers, reader)
 	}
 
 	// If no readers configured, default to pull mode
@@ -145,6 +172,17 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 	// Trả về hàm Shutdown để dọn dẹp tài nguyên khi dừng service
 	return func(ctx context.Context) error {
 		var errs []string
+
+		// ForceFlush Meter Provider to ensure all metrics are sent before shutdown
+		// This is especially important for short-lived jobs and batch processes
+		if err := mp.ForceFlush(ctx); err != nil {
+			errs = append(errs, fmt.Sprintf("meter provider force flush error: %v", err))
+		}
+
+		// ForceFlush Tracer Provider to ensure all traces are sent before shutdown
+		if err := tp.ForceFlush(ctx); err != nil {
+			errs = append(errs, fmt.Sprintf("tracer provider force flush error: %v", err))
+		}
 
 		// Shutdown Metrics Server (if pull mode enabled)
 		if metricsServer != nil {

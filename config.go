@@ -27,7 +27,7 @@ type BaseConfig struct {
 	MetricsPath              string  `env:"METRICS_PATH" env-default:"/metrics"`
 	MetricsPushEndpoint      string  `env:"METRICS_PUSH_ENDPOINT"`
 	MetricsPushInterval      int     `env:"METRICS_PUSH_INTERVAL" env-default:"30"`
-	MetricsProtocol          string  `env:"METRICS_PROTOCOL" env-default:"otlp"`
+	MetricsProtocol          string  `env:"METRICS_PROTOCOL" env-default:"http"`
 }
 
 
@@ -125,6 +125,17 @@ func finalizeAndValidate(cfg any) error {
 			if epField.IsValid() && strings.TrimSpace(epField.String()) == "" {
 				return fmt.Errorf("METRICS_PUSH_ENDPOINT is required for push/hybrid metrics mode")
 			}
+		}
+	}
+
+	// Logic for MetricsProtocol validation
+	mpField := v.FieldByName("MetricsProtocol")
+	if mpField.IsValid() {
+		mp := strings.ToLower(strings.TrimSpace(mpField.String()))
+		switch mp {
+		case "http", "grpc":
+		default:
+			return fmt.Errorf("invalid METRICS_PROTOCOL: %s (must be 'http' or 'grpc')", mp)
 		}
 	}
 

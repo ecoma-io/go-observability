@@ -46,11 +46,10 @@ func TestInitOtel(t *testing.T) {
 		// Allow some time for things to settle if needed, though strictly not necessary for unit test
 		time.Sleep(10 * time.Millisecond)
 
-		// Test Shutdown
-		err = shutdown(context.Background())
-		if err != nil {
-			t.Errorf("shutdown returned error: %v", err)
-		}
+		// Test Shutdown (may error due to no collector, but shouldn't panic)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = shutdown(ctx) // Ignore error as collector may not be running
 	})
 
 	t.Run("Init Success with Push Mode", func(t *testing.T) {
@@ -107,6 +106,98 @@ func TestInitOtel(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		// Test Shutdown (may error due to no collector, but shouldn't panic)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = shutdown(ctx) // Ignore error as collector may not be running
+	})
+
+	t.Run("Init Success with Push Mode - HTTP Protocol", func(t *testing.T) {
+		cfgPushHTTP := cfg
+		cfgPushHTTP.MetricsPort = 19093
+		cfgPushHTTP.MetricsMode = "push"
+		cfgPushHTTP.MetricsPushEndpoint = "localhost:4318"
+		cfgPushHTTP.MetricsPushInterval = 30
+		cfgPushHTTP.MetricsProtocol = "http"
+
+		shutdown, err := InitOtel(cfgPushHTTP)
+		if err != nil {
+			t.Fatalf("InitOtel with push mode and HTTP protocol failed: %v", err)
+		}
+		if shutdown == nil {
+			t.Fatal("shutdown function is nil")
+		}
+
+		// Create a meter to test push exporter with HTTP protocol
+		meter := GetMeter("test-meter-push-http")
+		if meter == nil {
+			t.Error("GetMeter returned nil for push mode with HTTP protocol")
+		}
+
+		// Allow some time for push to initialize
+		time.Sleep(10 * time.Millisecond)
+
+		// Test ForceFlush and Shutdown
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = shutdown(ctx) // Ignore error as collector may not be running
+	})
+
+	t.Run("Init Success with Push Mode - gRPC Protocol", func(t *testing.T) {
+		cfgPushGRPC := cfg
+		cfgPushGRPC.MetricsPort = 19094
+		cfgPushGRPC.MetricsMode = "push"
+		cfgPushGRPC.MetricsPushEndpoint = "localhost:4317"
+		cfgPushGRPC.MetricsPushInterval = 30
+		cfgPushGRPC.MetricsProtocol = "grpc"
+
+		shutdown, err := InitOtel(cfgPushGRPC)
+		if err != nil {
+			t.Fatalf("InitOtel with push mode and gRPC protocol failed: %v", err)
+		}
+		if shutdown == nil {
+			t.Fatal("shutdown function is nil")
+		}
+
+		// Create a meter to test push exporter with gRPC protocol
+		meter := GetMeter("test-meter-push-grpc")
+		if meter == nil {
+			t.Error("GetMeter returned nil for push mode with gRPC protocol")
+		}
+
+		// Allow some time for push to initialize
+		time.Sleep(10 * time.Millisecond)
+
+		// Test ForceFlush and Shutdown
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = shutdown(ctx) // Ignore error as collector may not be running
+	})
+
+	t.Run("Init Success with Hybrid Mode - gRPC Protocol", func(t *testing.T) {
+		cfgHybridGRPC := cfg
+		cfgHybridGRPC.MetricsPort = 19095
+		cfgHybridGRPC.MetricsMode = "hybrid"
+		cfgHybridGRPC.MetricsPushEndpoint = "localhost:4317"
+		cfgHybridGRPC.MetricsPushInterval = 30
+		cfgHybridGRPC.MetricsProtocol = "grpc"
+
+		shutdown, err := InitOtel(cfgHybridGRPC)
+		if err != nil {
+			t.Fatalf("InitOtel with hybrid mode and gRPC protocol failed: %v", err)
+		}
+		if shutdown == nil {
+			t.Fatal("shutdown function is nil")
+		}
+
+		// Verify both pull and push are initialized with gRPC protocol
+		meter := GetMeter("test-meter-hybrid-grpc")
+		if meter == nil {
+			t.Error("GetMeter returned nil for hybrid mode with gRPC protocol")
+		}
+
+		time.Sleep(10 * time.Millisecond)
+
+		// Test ForceFlush and Shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		_ = shutdown(ctx) // Ignore error as collector may not be running
