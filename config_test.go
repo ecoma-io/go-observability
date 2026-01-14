@@ -100,4 +100,81 @@ func TestLoadCfg(t *testing.T) {
 			t.Error("Expected LoadCfg to fail due to invalid LOG_LEVEL, but it succeeded")
 		}
 	})
+
+	t.Run("Metrics Mode Configuration", func(t *testing.T) {
+		_ = os.Unsetenv("LOG_LEVEL")
+		_ = os.Setenv("SERVICE_NAME", "metrics-test-service")
+		_ = os.Setenv("METRICS_MODE", "pull")
+
+		var cfg BaseConfig
+		err := LoadCfg(&cfg)
+		if err != nil {
+			t.Fatalf("LoadCfg failed: %v", err)
+		}
+
+		if cfg.MetricsMode != "pull" {
+			t.Errorf("Expected MetricsMode 'pull', got '%s'", cfg.MetricsMode)
+		}
+		if !cfg.IsPull() {
+			t.Error("Expected IsPull() to return true for 'pull' mode")
+		}
+		if cfg.IsPush() {
+			t.Error("Expected IsPush() to return false for 'pull' mode")
+		}
+	})
+
+	t.Run("Push Metrics Mode Validation", func(t *testing.T) {
+		_ = os.Unsetenv("LOG_LEVEL")
+		_ = os.Setenv("SERVICE_NAME", "push-test-service")
+		_ = os.Setenv("METRICS_MODE", "push")
+		_ = os.Unsetenv("METRICS_PUSH_ENDPOINT")
+
+		var cfg BaseConfig
+		err := LoadCfg(&cfg)
+		if err == nil {
+			t.Error("Expected LoadCfg to fail for push mode without METRICS_PUSH_ENDPOINT")
+		}
+	})
+
+	t.Run("Hybrid Metrics Mode", func(t *testing.T) {
+		_ = os.Unsetenv("LOG_LEVEL")
+		_ = os.Setenv("SERVICE_NAME", "hybrid-test-service")
+		_ = os.Setenv("METRICS_MODE", "hybrid")
+		_ = os.Setenv("METRICS_PUSH_ENDPOINT", "localhost:4318")
+		_ = os.Setenv("METRICS_PUSH_INTERVAL", "60")
+
+		var cfg BaseConfig
+		err := LoadCfg(&cfg)
+		if err != nil {
+			t.Fatalf("LoadCfg failed: %v", err)
+		}
+
+		if cfg.MetricsMode != "hybrid" {
+			t.Errorf("Expected MetricsMode 'hybrid', got '%s'", cfg.MetricsMode)
+		}
+		if !cfg.IsPull() {
+			t.Error("Expected IsPull() to return true for hybrid mode")
+		}
+		if !cfg.IsPush() {
+			t.Error("Expected IsPush() to return true for hybrid mode")
+		}
+		if !cfg.IsHybrid() {
+			t.Error("Expected IsHybrid() to return true for hybrid mode")
+		}
+		if cfg.MetricsPushInterval != 60 {
+			t.Errorf("Expected MetricsPushInterval 60, got %d", cfg.MetricsPushInterval)
+		}
+	})
+
+	t.Run("Invalid Metrics Mode", func(t *testing.T) {
+		_ = os.Unsetenv("LOG_LEVEL")
+		_ = os.Setenv("SERVICE_NAME", "invalid-mode-service")
+		_ = os.Setenv("METRICS_MODE", "invalid-mode")
+
+		var cfg BaseConfig
+		err := LoadCfg(&cfg)
+		if err == nil {
+			t.Error("Expected LoadCfg to fail due to invalid METRICS_MODE")
+		}
+	})
 }

@@ -261,13 +261,149 @@ go build -ldflags "-X '$MODULE_PATH.ServiceName=$SERVICE_NAME' \
 
 ## ⚙️ Environment Variables (Configuration)
 
-| Variable                   | Default          | Description                                        |
-| :------------------------- | :--------------- | :------------------------------------------------- |
-| `SERVICE_NAME`             | **(Required)**   | Service name (Used as `service.name` in Otel/Log)  |
-| `LOG_LEVEL`                | `info`           | Log level (`debug`, `info`, `warn`, `error`)       |
-| `OTEL_ENDPOINT`            | `localhost:4318` | OTLP Collector address over HTTP (for Tracing)     |
-| `METRICS_PORT`             | `9090`           | Port to run the Metrics server (Prometheus format) |
-| `OTEL_TRACING_SAMPLE_RATE` | `1.0`            | Tracing sample rate (0.0 to 1.0)                   |
+| Variable                   | Default          | Description                                           |
+| :------------------------- | :--------------- | :---------------------------------------------------- |
+| `SERVICE_NAME`             | **(Required)**   | Service name (Used as `service.name` in Otel/Log)     |
+| `LOG_LEVEL`                | `info`           | Log level (`debug`, `info`, `warn`, `error`)          |
+| `OTEL_ENDPOINT`            | `localhost:4318` | OTLP Collector address over HTTP (for Tracing)        |
+| `METRICS_MODE`             | `pull`           | Metrics collection mode: `pull`, `push`, or `hybrid`  |
+| `METRICS_PORT`             | `9090`           | Port to run the Metrics server (Prometheus format)    |
+| `METRICS_PATH`             | `/metrics`       | HTTP endpoint path for Prometheus metrics (pull mode) |
+| `METRICS_PUSH_ENDPOINT`    | **(Optional)**   | OTLP metrics collector endpoint (for push mode)       |
+| `METRICS_PUSH_INTERVAL`    | `30`             | Metrics push interval in seconds (push mode)          |
+| `OTEL_TRACING_SAMPLE_RATE` | `1.0`            | Tracing sample rate (0.0 to 1.0)                      |
+
+### 📊 Metrics Modes
+
+The library supports three metrics collection modes:
+
+#### 1. **Pull Mode (Default)** - Prometheus Scraping
+
+In pull mode, the service exposes a Prometheus metrics endpoint that Prometheus scrapes at regular
+intervals.
+
+**Configuration:**
+
+```bash
+METRICS_MODE=pull
+METRICS_PORT=9090
+METRICS_PATH=/metrics
+```
+
+**Example Setup:**
+
+```yaml
+# docker-compose.yml
+services:
+  my-service:
+    environment:
+      METRICS_MODE: pull
+      METRICS_PORT: 9090
+
+  prometheus:
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command: --config.file=/etc/prometheus/prometheus.yml
+```
+
+**prometheus.yml:**
+
+```yaml
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "my-service"
+    static_configs:
+      - targets: ["my-service:9090"]
+```
+
+**Benefits:**
+
+- ✅ Simple deployment (no external metrics pipeline needed)
+- ✅ Services are in control of metric emission
+- ✅ Lower latency for metric queries
+- ✅ Compatible with Prometheus ecosystem
+
+#### 2. **Push Mode** - OTLP Push to Collector
+
+In push mode, the service actively pushes metrics to an OTLP metrics collector at regular intervals.
+
+**Configuration:**
+
+```bash
+METRICS_MODE=push
+METRICS_PUSH_ENDPOINT=localhost:4318
+METRICS_PUSH_INTERVAL=30
+```
+
+**Example Setup:**
+
+```yaml
+# docker-compose.yml
+services:
+  my-service:
+    environment:
+      METRICS_MODE: push
+      METRICS_PUSH_ENDPOINT: otel-collector:4318
+      METRICS_PUSH_INTERVAL: 30
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel-config.yaml:/etc/otel/config.yaml
+```
+
+**Benefits:**
+
+- ✅ Suitable for ephemeral/serverless workloads
+- ✅ Centralized metrics collection
+- ✅ Integration with OTLP ecosystem (Datadog, New Relic, etc.)
+- ✅ No need for Prometheus scraping configuration
+
+#### 3. **Hybrid Mode** - Pull + Push
+
+In hybrid mode, metrics are both exposed via Prometheus endpoint AND pushed to an OTLP collector.
+
+**Configuration:**
+
+```bash
+METRICS_MODE=hybrid
+METRICS_PORT=9090
+METRICS_PATH=/metrics
+METRICS_PUSH_ENDPOINT=localhost:4318
+METRICS_PUSH_INTERVAL=30
+```
+
+**Benefits:**
+
+- ✅ Flexibility to use both Prometheus and OTLP collectors
+- ✅ Fallback: if push fails, pull still works
+- ✅ Redundancy in metrics collection
+- ✅ Gradual migration path from pull to push
+
+### Helper Methods
+
+The `BaseConfig` struct provides helper methods to check metrics mode:
+
+```go
+cfg := BaseConfig{
+    MetricsMode: "push",
+}
+
+if cfg.IsPull() {    // Check if pull is enabled (pull or hybrid)
+    // Setup pull metrics endpoint
+}
+
+if cfg.IsPush() {    // Check if push is enabled (push or hybrid)
+    // Setup push exporter
+}
+
+if cfg.IsHybrid() {  // Check if hybrid mode (both pull and push)
+    // Setup both
+}
+```
 
 ## 🧪 Testing
 

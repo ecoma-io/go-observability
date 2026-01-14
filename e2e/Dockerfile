@@ -27,9 +27,9 @@ ENV GOOS=linux
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     go build \
-    -ldflags="-X 'github.com/ecoma-io/go-observability.Version=${VERSION}' \
-              -X 'github.com/ecoma-io/go-observability.BuildTime=${BUILD_TIME}' \
-              -X 'github.com/ecoma-io/go-observability.ServiceName=${SERVICE_NAME}'" \
+    -ldflags="-X github.com/ecoma-io/go-observability.Version=${VERSION} \
+              -X github.com/ecoma-io/go-observability.BuildTime=${BUILD_TIME} \
+              -X github.com/ecoma-io/go-observability.ServiceName=${SERVICE_NAME}" \
     -o /app/service .
 
 # Runtime stage
