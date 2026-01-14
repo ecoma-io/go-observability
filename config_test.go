@@ -177,4 +177,73 @@ func TestLoadCfg(t *testing.T) {
 			t.Error("Expected LoadCfg to fail due to invalid METRICS_MODE")
 		}
 	})
+
+	t.Run("Metrics Protocol - HTTP", func(t *testing.T) {
+		_ = os.Unsetenv("LOG_LEVEL")
+		_ = os.Setenv("SERVICE_NAME", "http-protocol-service")
+		_ = os.Setenv("METRICS_MODE", "push")
+		_ = os.Setenv("METRICS_PUSH_ENDPOINT", "localhost:4318")
+		_ = os.Setenv("METRICS_PROTOCOL", "http")
+
+		var cfg BaseConfig
+		err := LoadCfg(&cfg)
+		if err != nil {
+			t.Fatalf("LoadCfg failed: %v", err)
+		}
+
+		if cfg.MetricsProtocol != "http" {
+			t.Errorf("Expected MetricsProtocol 'http', got '%s'", cfg.MetricsProtocol)
+		}
+	})
+
+	t.Run("Metrics Protocol - gRPC", func(t *testing.T) {
+		_ = os.Unsetenv("LOG_LEVEL")
+		_ = os.Setenv("SERVICE_NAME", "grpc-protocol-service")
+		_ = os.Setenv("METRICS_MODE", "push")
+		_ = os.Setenv("METRICS_PUSH_ENDPOINT", "localhost:4317")
+		_ = os.Setenv("METRICS_PROTOCOL", "grpc")
+
+		var cfg BaseConfig
+		err := LoadCfg(&cfg)
+		if err != nil {
+			t.Fatalf("LoadCfg failed: %v", err)
+		}
+
+		if cfg.MetricsProtocol != "grpc" {
+			t.Errorf("Expected MetricsProtocol 'grpc', got '%s'", cfg.MetricsProtocol)
+		}
+	})
+
+	t.Run("Invalid Metrics Protocol", func(t *testing.T) {
+		_ = os.Unsetenv("LOG_LEVEL")
+		_ = os.Setenv("SERVICE_NAME", "invalid-protocol-service")
+		_ = os.Setenv("METRICS_MODE", "push")
+		_ = os.Setenv("METRICS_PUSH_ENDPOINT", "localhost:4318")
+		_ = os.Setenv("METRICS_PROTOCOL", "invalid-protocol")
+
+		var cfg BaseConfig
+		err := LoadCfg(&cfg)
+		if err == nil {
+			t.Error("Expected LoadCfg to fail due to invalid METRICS_PROTOCOL")
+		}
+	})
+
+	t.Run("Default Metrics Protocol", func(t *testing.T) {
+		_ = os.Unsetenv("LOG_LEVEL")
+		_ = os.Setenv("SERVICE_NAME", "default-protocol-service")
+		_ = os.Setenv("METRICS_MODE", "push")
+		_ = os.Setenv("METRICS_PUSH_ENDPOINT", "localhost:4318")
+		_ = os.Unsetenv("METRICS_PROTOCOL")
+
+		var cfg BaseConfig
+		err := LoadCfg(&cfg)
+		if err != nil {
+			t.Fatalf("LoadCfg failed: %v", err)
+		}
+
+		// Default should be "http"
+		if cfg.MetricsProtocol != "http" {
+			t.Errorf("Expected default MetricsProtocol 'http', got '%s'", cfg.MetricsProtocol)
+		}
+	})
 }
