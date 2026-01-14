@@ -103,6 +103,7 @@ docker compose up -d --build
 # Wait for services to be ready instead of fixed sleep
 wait_for_http "http://localhost:$SIMPLE_APP_PORT/ping" "simple-service" 20
 wait_for_http "http://localhost:$GIN_APP_PORT/ping" "gin-service" 20
+wait_for_http "http://localhost:$GIN_APP_PORT/health" "gin-service health" 20
 wait_for_http "http://localhost:$GRPC_HEALTH_PORT/health" "grpc-service" 20
 wait_for_http "http://localhost:$SIMPLE_PUSH_APP_PORT/ping" "simple-service-push" 20
 wait_for_http "http://localhost:$GIN_HYBRID_APP_PORT/ping" "gin-service-hybrid" 20
@@ -129,6 +130,15 @@ for _ in {1..5}; do
    curl -s "http://localhost:$GIN_APP_PORT/ping" > /dev/null &
    curl -s "http://localhost:$GIN_APP_PORT/users/123" > /dev/null &
 done
+
+# Test skipped routes (health and metrics - should not appear in logs/traces)
+echo "Testing gin-service skipped routes (health, metrics, status)..."
+for _ in {1..3}; do
+   curl -s "http://localhost:$GIN_APP_PORT/health" > /dev/null &
+   curl -s "http://localhost:$GIN_APP_PORT/metrics" > /dev/null &
+   curl -s "http://localhost:$GIN_APP_PORT/status" > /dev/null &
+done
+
 wait
 
 echo "Testing gin-service with hybrid mode..."

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ecoma-io/go-observability"
@@ -51,12 +52,44 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 
-	// Apply observability middleware
-	for _, mw := range observability.GinMiddleware(logger, cfg.ServiceName) {
+	// Create middleware config to skip health and metrics endpoints
+	middlewareConfig := &observability.ObservabilityMiddlewareConfig{
+		SkipRoute: func(path string) bool {
+			// Skip health checks and metrics endpoints
+			return strings.HasPrefix(path, "/health") ||
+				strings.HasPrefix(path, "/metrics") ||
+				path == "/status"
+		},
+	}
+
+	// Apply observability middleware with skip configuration
+	for _, mw := range observability.GinMiddlewareWithConfig(logger, cfg.ServiceName, middlewareConfig) {
 		router.Use(mw)
 	}
 
 	// Define routes
+	// Health check endpoint (skipped from observability)
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "healthy",
+		})
+	})
+
+	// Metrics endpoint (skipped from observability)
+	router.GET("/metrics", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "metrics endpoint",
+		})
+	})
+
+	// Status endpoint (skipped from observability)
+	router.GET("/status", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ok",
+		})
+	})
+
+	// Ping endpoint (tracked in observability)
 	router.GET("/ping", pingHandler)
 	router.GET("/users/:id", getUserHandler)
 	router.GET("/panic", panicHandler)
