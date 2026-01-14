@@ -28,6 +28,13 @@ tasks:
     cmds:
       - go test ./... -v
 
+  test:coverage:
+    desc: "Run unit tests with coverage"
+    cmds:
+      - go test ./... -coverprofile=coverage.out
+      - go tool cover -func=coverage.out
+      - go tool cover -html=coverage.out -o coverage.html
+
   build:
     desc: "Build the project"
     cmds:

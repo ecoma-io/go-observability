@@ -46,8 +46,14 @@ jobs:
         with:
           version: v2.6
 
-      - name: Run integration tests
-        run: go test -v ./...
+      - name: Run tests with coverage
+        run: go test -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-out
+          path: coverage.out
 
       - name: Run E2E tests
         run: bash e2e/run-e2e.sh
@@ -88,7 +94,7 @@ jobs:
     # and sets a GitHub status via an external action.
     name: Report
     needs: [integration-checks, release]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     if: ${{ always() }}
     steps:
       - name: Setup project
@@ -98,3 +104,32 @@ jobs:
           context: ci-completed
           state: ${{ (needs.integration-checks.result != 'failure' && needs.release.result != 'failure') && 'success' || 'failure' }}
           sha: ${{github.event.pull_request.head.sha || github.sha}}
+
+      # Coverage upload: only run when integration-checks succeeded
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download coverage artifact
+        if: ${{ needs.integration-checks.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-out
+          path: .
+
+      - name: Set up Go (for coverage upload)
+        if: ${{ needs.integration-checks.result == 'success' }}
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: Install goveralls
+        if: ${{ needs.integration-checks.result == 'success' }}
+        run: go install github.com/mattn/goveralls@latest
+
+      - name: Upload to Coveralls
+        if: ${{ needs.integration-checks.result == 'success' }}
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+        run: |
+          GOPATH=$(go env GOPATH)
+          ${GOPATH}/bin/goveralls -coverprofile=coverage.out -service=github -repotoken $COVERALLS_REPO_TOKEN

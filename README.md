@@ -1,6 +1,9 @@
 <!-- markdownlint-disable -->
 <div align="center">
 
+![GitHub Release](https://img.shields.io/github/v/release/ecoma-io/go-observability)
+![Coveralls](https://img.shields.io/coverallsCoverage/github/ecoma-io/go-observability)
+![GitHub License](https://img.shields.io/github/license/ecoma-io/go-observability)
 [![Open in DevContainer](https://img.shields.io/badge/Open-DevContainer-blue.svg)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/ecoma-io/services)
 
 </div>
