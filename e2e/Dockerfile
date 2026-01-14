@@ -8,18 +8,18 @@ ARG SERVICE_DIR=simple-service
 
 WORKDIR /workspace
 
-# 1. Chỉ copy files định nghĩa dependency trước
+# 1. Only copy dependency definition files first
 COPY go.mod go.sum ./
-# Nếu dự án có sử dụng 'replace' tới local modules, bạn cần copy cả go.mod của chúng
-# Ví dụ: COPY internal/pkg/go.mod ./internal/pkg/
+# If the project uses 'replace' to local modules, you need to copy their go.mod as well
+# Example: COPY internal/pkg/go.mod ./internal/pkg/
 
-# 2. Download dependencies (Layer này sẽ được cached nếu go.mod/go.sum không đổi)
+# 2. Download dependencies (this layer will be cached if go.mod/go.sum do not change)
 RUN go mod download
 
-# 3. Copy toàn bộ source code sau khi đã download xong deps
+# 3. Copy the full source code after dependencies have been downloaded
 COPY . .
 
-# 4. Sử dụng BuildKit Cache Mount để tăng tốc compile
+# 4. Use BuildKit Cache Mount to speed up compilation
 WORKDIR /workspace/examples/${SERVICE_DIR}
 ENV CGO_ENABLED=0
 ENV GOOS=linux

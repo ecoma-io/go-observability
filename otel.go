@@ -22,11 +22,12 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// InitOtel khởi tạo OpenTelemetry với hỗ trợ Tracing (Push) và Metrics (Pull/Push/Hybrid)
+// InitOtel initializes OpenTelemetry with support for Tracing (Push)
+// and Metrics (Pull/Push/Hybrid)
 func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 	ctx := context.Background()
 
-	// 1. Khởi tạo Resource định danh dịch vụ
+	// 1. Initialize Resource identifying the service
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
 			semconv.ServiceName(cfg.ServiceName),
@@ -37,7 +38,7 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
-	// 2. Cấu hình Tracing (Push model gửi đến Otel Collector)
+	// 2. Configure Tracing (Push model sending to Otel Collector)
 	traceExp, err := otlptracehttp.New(ctx,
 		otlptracehttp.WithEndpoint(cfg.OtelEndpoint),
 		otlptracehttp.WithInsecure(),
@@ -53,7 +54,7 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 	)
 	otel.SetTracerProvider(tp)
 
-	// 3. Cấu hình Metrics dựa trên MetricsMode
+	// 3. Configure Metrics based on MetricsMode
 	var (
 		mp              *sdkmetric.MeterProvider
 		metricsServer   *http.Server
@@ -61,7 +62,7 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 		readers         []sdkmetric.Reader
 	)
 
-	// Setup metrics exporter(s) dựa trên mode
+	// Setup metrics exporter(s) based on mode
 	if cfg.IsPull() {
 		// Pull mode: Prometheus exporter
 		promExporter, err := prometheus.New()
@@ -70,7 +71,7 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 		}
 		readers = append(readers, promExporter)
 
-		// Setup HTTP server cho pull metrics
+		// Setup HTTP server for pull metrics
 		mux := http.NewServeMux()
 		mux.Handle(cfg.MetricsPath, promhttp.Handler())
 
@@ -163,13 +164,13 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 	mp = sdkmetric.NewMeterProvider(opts...)
 	otel.SetMeterProvider(mp)
 
-	// 4. Cấu hình Global Propagator (W3C Trace Context & Baggage)
+	// 4. Configure Global Propagator (W3C Trace Context & Baggage)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
 
-	// Trả về hàm Shutdown để dọn dẹp tài nguyên khi dừng service
+	// Return a Shutdown function to clean up resources when service stops
 	return func(ctx context.Context) error {
 		var errs []string
 
@@ -215,12 +216,12 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 	}, nil
 }
 
-// GetTracer trả về một tracer instance
+// GetTracer returns a tracer instance
 func GetTracer(name string) trace.Tracer {
 	return otel.Tracer(name)
 }
 
-// GetMeter trả về một meter instance
+// GetMeter returns a meter instance
 func GetMeter(name string) metric.Meter {
 	return otel.Meter(name)
 }
