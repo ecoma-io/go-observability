@@ -46,6 +46,9 @@ jobs:
         with:
           version: v2.6
 
+      - name: Run go vet
+        run: go vet ./...
+
       - name: Run tests with coverage
         run: go test -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
 
