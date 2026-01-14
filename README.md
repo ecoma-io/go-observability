@@ -11,7 +11,7 @@
 </div>
 <!-- markdownlint-restore -->
 
-# Ecoma Go Observability Library
+# Go Observability
 
 A standardized library for Golang microservices at **Ecoma-io**, providing built-in
 **Configuration**, **Structured Logging (Zap)**, and **Observability (OpenTelemetry)**.
