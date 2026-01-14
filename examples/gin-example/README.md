@@ -1,6 +1,7 @@
 # Gin Middleware Example
 
-This example demonstrates how to use the Ecoma Go Observability library with Gin framework.
+This example demonstrates how to use the Ecoma Go Observability library with Gin framework,
+including advanced features like route skipping for health checks and metrics.
 
 ## Features Demonstrated
 
@@ -9,6 +10,7 @@ This example demonstrates how to use the Ecoma Go Observability library with Gin
 - ✅ Trace ID propagation in responses
 - ✅ OpenTelemetry tracing integration
 - ✅ Prometheus metrics collection
+- ✅ Route skipping for health checks and metrics endpoints
 
 ## Running the Example
 
@@ -31,25 +33,43 @@ go run main.go
 
 ### 3. Test the endpoints
 
-**Normal request:**
+**Normal request (tracked):**
 
 ```bash
 curl http://localhost:8080/ping
 ```
 
-**User endpoint with tracing:**
+**User endpoint with tracing (tracked):**
 
 ```bash
 curl http://localhost:8080/users/123
 ```
 
-**Trigger panic (recovery test):**
+**Health check (NOT tracked - skipped):**
+
+```bash
+curl http://localhost:8080/health
+```
+
+**Metrics endpoint (NOT tracked - skipped):**
+
+```bash
+curl http://localhost:8080/metrics
+```
+
+**Status endpoint (NOT tracked - skipped):**
+
+```bash
+curl http://localhost:8080/status
+```
+
+**Trigger panic (recovery test - tracked):**
 
 ```bash
 curl http://localhost:8080/error
 ```
 
-**Client error:**
+**Client error (tracked):**
 
 ```bash
 curl http://localhost:8080/not-found
@@ -57,7 +77,7 @@ curl http://localhost:8080/not-found
 
 ## Expected Logs
 
-### Success Request (200)
+### Success Request (200) - TRACKED
 
 ```json
 {
@@ -74,7 +94,15 @@ curl http://localhost:8080/not-found
 }
 ```
 
-### Panic Recovery (500)
+### Health Check (200) - SKIPPED
+
+❌ **No log entry** - Health checks are excluded from observability tracking
+
+```bash
+# No JSON log output for this request
+```
+
+### Panic Recovery (500) - TRACKED
 
 ```json
 {
@@ -98,6 +126,37 @@ curl http://localhost:8080/not-found
   "message": "An unexpected error occurred. Please try again later.",
   "trace_id": "a1b2c3d4e5f6...",
   "path": "/error"
+}
+```
+
+## Route Skipping Configuration
+
+This example uses a **custom predicate function** to skip observability for health and metrics
+endpoints:
+
+```go
+middlewareConfig := &observability.ObservabilityMiddlewareConfig{
+    SkipRoute: func(path string) bool {
+        // Skip health checks and metrics endpoints
+        return strings.HasPrefix(path, "/health") ||
+               strings.HasPrefix(path, "/metrics") ||
+               path == "/status"
+    },
+}
+
+// Apply middleware with skip configuration
+for _, mw := range observability.GinMiddlewareWithConfig(logger, cfg.ServiceName, middlewareConfig) {
+    router.Use(mw)
+}
+```
+
+### Alternative: Using ExcludedPaths
+
+If you prefer a simple list of paths:
+
+```go
+middlewareConfig := &observability.ObservabilityMiddlewareConfig{
+    ExcludedPaths: []string{"/health", "/metrics", "/status"},
 }
 ```
 
@@ -128,21 +187,39 @@ go run main.go
 ## Code Structure
 
 ```go
-// Apply middleware to Gin router
-for _, mw := range observability.GinMiddleware(logger, cfg.ServiceName) {
+// Create middleware config to skip health and metrics endpoints
+middlewareConfig := &observability.ObservabilityMiddlewareConfig{
+    SkipRoute: func(path string) bool {
+        return strings.HasPrefix(path, "/health") ||
+               strings.HasPrefix(path, "/metrics") ||
+               path == "/status"
+    },
+}
+
+// Apply middleware to Gin router with skip configuration
+for _, mw := range observability.GinMiddlewareWithConfig(logger, cfg.ServiceName, middlewareConfig) {
     router.Use(mw)
 }
 
-// Or apply individually:
-// router.Use(observability.GinRecovery(logger))
-// router.Use(observability.GinLogger(logger))
+// Or apply middleware without skip (tracks all routes):
+// for _, mw := range observability.GinMiddleware(logger, cfg.ServiceName) {
+//     router.Use(mw)
+// }
 ```
 
 ## Middleware Order
 
 The middleware is applied in this order:
 
-1. **GinRecovery** - Catches panics first
-2. **GinLogger** - Logs all requests (including recovered ones)
+1. **GinTracing** - Creates tracing spans (or skips if route is excluded)
+2. **GinRecovery** - Catches panics first (respects skip configuration)
+3. **GinLogger** - Logs all requests (or skips if route is excluded)
 
-This ensures that even panic-recovered requests are properly logged.
+This ensures that even panic-recovered requests are properly logged, unless explicitly skipped.
+
+### Benefits of Route Skipping
+
+- 📉 **Reduced Noise**: Health checks won't clutter your traces and logs
+- ⚡ **Better Performance**: Skipped routes don't incur observability overhead
+- 🎯 **Cleaner Signals**: Metrics and traces focus on actual business logic
+- 🔍 **Easier Debugging**: Less noise makes it easier to find important events

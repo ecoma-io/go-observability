@@ -137,6 +137,52 @@ func main() {
 - ✅ Panic recovery with structured error responses
 - ✅ Trace ID in response headers (X-Trace-ID) and error responses
 - ✅ Status-based log levels (info/warn/error)
+- ✅ Route skipping capabilities for health checks and metrics endpoints
+
+#### Route Skipping (Skip Health Checks & Metrics)
+
+The Gin middleware supports skipping observability tracking for certain routes, such as `/health` or
+`/metrics` endpoints. This reduces noise in logs and traces.
+
+**Option 1: Using ExcludedPaths (list of paths)**
+
+```go
+middlewareCfg := &observability.ObservabilityMiddlewareConfig{
+    ExcludedPaths: []string{"/health", "/metrics", "/status"},
+}
+
+// Apply middleware with skip configuration
+for _, mw := range observability.GinMiddlewareWithConfig(logger, cfg.ServiceName, middlewareCfg) {
+    router.Use(mw)
+}
+```
+
+**Option 2: Using SkipRoute (custom predicate function)**
+
+```go
+import "strings"
+
+middlewareCfg := &observability.ObservabilityMiddlewareConfig{
+    SkipRoute: func(path string) bool {
+        // Skip paths that start with /health or /metrics
+        return strings.HasPrefix(path, "/health") ||
+               strings.HasPrefix(path, "/metrics")
+    },
+}
+
+for _, mw := range observability.GinMiddlewareWithConfig(logger, cfg.ServiceName, middlewareCfg) {
+    router.Use(mw)
+}
+```
+
+**Behavior for Skipped Routes:**
+
+- 🚫 No span is created for tracing
+- 🚫 No request is logged
+- 🚫 No metrics are recorded
+
+This ensures that frequently accessed health check and metrics endpoints don't clutter your
+observability data.
 
 **Example Log Output:**
 
