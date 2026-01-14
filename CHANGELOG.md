@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.0](https://github.com/ecoma-io/go-observability/compare/v1.2.1...v1.3.0) (2026-01-14)
+
+
+### Features
+
+* add native OTLP metric export ([7b3fef4](https://github.com/ecoma-io/go-observability/commit/7b3fef43932a01a409e8d53b4729ab719e771f0e))
+* add route skipping capabilities for Gin middleware ([b3090c4](https://github.com/ecoma-io/go-observability/commit/b3090c47884b39adc8017799788e6ecdf07824a4)), closes [#8](https://github.com/ecoma-io/go-observability/issues/8)
+* add support for hybrid metrics mode ([a31ca0f](https://github.com/ecoma-io/go-observability/commit/a31ca0f3ec6866aac462150bdfcd2798b1975cfe)), closes [#5](https://github.com/ecoma-io/go-observability/issues/5)
+
 ## [1.2.1](https://github.com/ecoma-io/go-observability/compare/v1.2.0...v1.2.1) (2026-01-10)
 
 
