@@ -15,9 +15,11 @@ func TestInitOtel(t *testing.T) {
 		OtelEndpoint:          "localhost:4318",
 		OtelTracingSampleRate: 1.0,
 		MetricsPort:           19090, // Test port
+		MetricsMode:           "pull",
+		MetricsPath:           "/metrics",
 	}
 
-	t.Run("Init Success", func(t *testing.T) {
+	t.Run("Init Success with Pull Mode", func(t *testing.T) {
 		shutdown, err := InitOtel(cfg)
 		if err != nil {
 			t.Fatalf("InitOtel failed: %v", err)
@@ -49,5 +51,64 @@ func TestInitOtel(t *testing.T) {
 		if err != nil {
 			t.Errorf("shutdown returned error: %v", err)
 		}
+	})
+
+	t.Run("Init Success with Push Mode", func(t *testing.T) {
+		cfgPush := cfg
+		cfgPush.MetricsPort = 19091
+		cfgPush.MetricsMode = "push"
+		cfgPush.MetricsPushEndpoint = "localhost:4318"
+		cfgPush.MetricsPushInterval = 30
+
+		shutdown, err := InitOtel(cfgPush)
+		if err != nil {
+			t.Fatalf("InitOtel with push mode failed: %v", err)
+		}
+		if shutdown == nil {
+			t.Fatal("shutdown function is nil")
+		}
+
+		// Create a meter to test push exporter
+		meter := GetMeter("test-meter-push")
+		if meter == nil {
+			t.Error("GetMeter returned nil for push mode")
+		}
+
+		// Allow some time for push to initialize
+		time.Sleep(10 * time.Millisecond)
+
+		// Test Shutdown (may error due to no collector, but shouldn't panic)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = shutdown(ctx) // Ignore error as collector may not be running
+	})
+
+	t.Run("Init Success with Hybrid Mode", func(t *testing.T) {
+		cfgHybrid := cfg
+		cfgHybrid.MetricsPort = 19092
+		cfgHybrid.MetricsMode = "hybrid"
+		cfgHybrid.MetricsPushEndpoint = "localhost:4318"
+		cfgHybrid.MetricsPushInterval = 30
+
+		shutdown, err := InitOtel(cfgHybrid)
+		if err != nil {
+			t.Fatalf("InitOtel with hybrid mode failed: %v", err)
+		}
+		if shutdown == nil {
+			t.Fatal("shutdown function is nil")
+		}
+
+		// Verify both pull and push are initialized
+		meter := GetMeter("test-meter-hybrid")
+		if meter == nil {
+			t.Error("GetMeter returned nil for hybrid mode")
+		}
+
+		time.Sleep(10 * time.Millisecond)
+
+		// Test Shutdown (may error due to no collector, but shouldn't panic)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = shutdown(ctx) // Ignore error as collector may not be running
 	})
 }

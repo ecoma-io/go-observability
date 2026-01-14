@@ -101,6 +101,67 @@ services:
     networks:
       - e2e-network
 
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: pushgateway
+    ports:
+      - "9091:9091"
+    networks:
+      - e2e-network
+
+  simple-service-push:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+      args:
+        - VERSION=v1.0.0-e2e-push
+        - BUILD_TIME=${BUILD_TIME:-2026-01-07T00:00:00Z}
+        - SERVICE_NAME=simple-service-e2e-push
+        - SERVICE_DIR=simple-service
+    container_name: simple-service-push
+    ports:
+      - "8084:8080"
+    environment:
+      - SERVICE_NAME=simple-service-push
+      - PORT=8080
+      - METRICS_MODE=push
+      - METRICS_PUSH_ENDPOINT=otel-collector:4318
+      - METRICS_PUSH_INTERVAL=30
+      - OTEL_ENDPOINT=otel-collector:4318
+      - LOG_LEVEL=info
+    depends_on:
+      - otel-collector
+    networks:
+      - e2e-network
+
+  gin-service-hybrid:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+      args:
+        - VERSION=v1.0.0-e2e-hybrid
+        - BUILD_TIME=${BUILD_TIME:-2026-01-07T00:00:00Z}
+        - SERVICE_NAME=gin-service-e2e-hybrid
+        - SERVICE_DIR=gin-service
+    container_name: gin-service-hybrid
+    ports:
+      - "8085:8080"
+      - "9095:9090"
+    environment:
+      - SERVICE_NAME=gin-service-hybrid
+      - PORT=8080
+      - METRICS_PORT=9090
+      - METRICS_MODE=hybrid
+      - METRICS_PATH=/metrics
+      - METRICS_PUSH_ENDPOINT=otel-collector:4318
+      - METRICS_PUSH_INTERVAL=30
+      - OTEL_ENDPOINT=otel-collector:4318
+      - LOG_LEVEL=info
+    depends_on:
+      - otel-collector
+    networks:
+      - e2e-network
+
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: jaeger

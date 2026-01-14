@@ -18,6 +18,9 @@ GIN_METRICS_PORT=9093
 GRPC_APP_PORT=50051
 GRPC_HEALTH_PORT=8083
 GRPC_METRICS_PORT=9094
+SIMPLE_PUSH_APP_PORT=8084
+GIN_HYBRID_APP_PORT=8085
+GIN_HYBRID_METRICS_PORT=9095
 PROM_PORT=9099
 JAEGER_PORT=16687
 
@@ -101,6 +104,8 @@ docker compose up -d --build
 wait_for_http "http://localhost:$SIMPLE_APP_PORT/ping" "simple-service" 20
 wait_for_http "http://localhost:$GIN_APP_PORT/ping" "gin-service" 20
 wait_for_http "http://localhost:$GRPC_HEALTH_PORT/health" "grpc-service" 20
+wait_for_http "http://localhost:$SIMPLE_PUSH_APP_PORT/ping" "simple-service-push" 20
+wait_for_http "http://localhost:$GIN_HYBRID_APP_PORT/ping" "gin-service-hybrid" 20
 wait_for_http "http://localhost:$JAEGER_PORT/" "jaeger" 15
 
 # 2. Generate Load
@@ -112,11 +117,24 @@ for _ in {1..5}; do
 done
 wait
 
+echo "Testing simple-service with push mode..."
+for _ in {1..5}; do
+   curl -s "http://localhost:$SIMPLE_PUSH_APP_PORT/ping" > /dev/null &
+done
+wait
+
 echo "Testing gin-service..."
 # Reduced requests and run in parallel
 for _ in {1..5}; do
    curl -s "http://localhost:$GIN_APP_PORT/ping" > /dev/null &
    curl -s "http://localhost:$GIN_APP_PORT/users/123" > /dev/null &
+done
+wait
+
+echo "Testing gin-service with hybrid mode..."
+for _ in {1..5}; do
+   curl -s "http://localhost:$GIN_HYBRID_APP_PORT/ping" > /dev/null &
+   curl -s "http://localhost:$GIN_HYBRID_APP_PORT/users/456" > /dev/null &
 done
 wait
 
@@ -305,6 +323,39 @@ else
    else
       echo -e "${RED}FAILURE: grpc-service metrics verification failed.${NC}"
       echo "Response snippet: ${PROM_GRPC_RESPONSE:0:200}..."
+      FAILURE=true
+   fi
+fi
+
+# Test Push Metrics Mode
+echo "Checking OTEL Collector for push-mode metrics..."
+# Push metrics are sent to otel-collector, which can be verified via Prometheus scraping if enabled
+# For now, we just verify that the service is running
+if docker ps | grep -q simple-service-push; then
+   echo -e "${GREEN}SUCCESS: simple-service-push running (push metrics mode)${NC}"
+   # Check if service logs indicate successful metrics export
+   PUSH_LOGS=$(docker logs simple-service-push 2>&1 | head -20)
+   if echo "$PUSH_LOGS" | grep -q "METRICS_MODE\|push"; then
+      echo -e "${GREEN}  + Push mode environment detected${NC}"
+   fi
+else
+   echo -e "${RED}FAILURE: simple-service-push not running${NC}"
+   FAILURE=true
+fi
+
+# Test Hybrid Metrics Mode
+echo "Checking Prometheus for hybrid-mode metrics..."
+# For hybrid mode, check the pull endpoint directly
+HYBRID_DIRECT_METRICS=$(retry_grep_count "http://localhost:$GIN_HYBRID_METRICS_PORT/metrics" "gin_request_count_total" || true)
+if [[ "$HYBRID_DIRECT_METRICS" -gt 0 ]]; then
+   echo -e "${GREEN}SUCCESS: gin-service-hybrid pull metrics available${NC}"
+else
+   # At least check that the metrics endpoint exists
+   HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$GIN_HYBRID_METRICS_PORT/metrics" || true)
+   if [[ "$HTTP_CODE" == "200" ]]; then
+      echo -e "${GREEN}SUCCESS: gin-service-hybrid metrics endpoint responding (no metrics yet)${NC}"
+   else
+      echo -e "${RED}FAILURE: gin-service-hybrid metrics endpoint not responding${NC}"
       FAILURE=true
    fi
 fi

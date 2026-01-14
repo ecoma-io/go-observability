@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/metric"
@@ -19,7 +21,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// InitOtel khởi tạo OpenTelemetry với Tracing (Push) và Metrics (Pull via Prometheus)
+// InitOtel khởi tạo OpenTelemetry với hỗ trợ Tracing (Push) và Metrics (Pull/Push/Hybrid)
 func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 	ctx := context.Background()
 
@@ -37,7 +39,7 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 	// 2. Cấu hình Tracing (Push model gửi đến Otel Collector)
 	traceExp, err := otlptracehttp.New(ctx,
 		otlptracehttp.WithEndpoint(cfg.OtelEndpoint),
-		otlptracehttp.WithInsecure(), // Sử dụng WithTLSCredentials() cho production
+		otlptracehttp.WithInsecure(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create trace exporter: %w", err)
@@ -50,35 +52,91 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 	)
 	otel.SetTracerProvider(tp)
 
-	// 3. Cấu hình Metrics (Pull model thông qua Prometheus exporter)
-	promExporter, err := prometheus.New()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create prometheus exporter: %w", err)
+	// 3. Cấu hình Metrics dựa trên MetricsMode
+	var (
+		mp              *sdkmetric.MeterProvider
+		metricsServer   *http.Server
+		metricsShutdown []func(context.Context) error
+		readers         []sdkmetric.Reader
+	)
+
+	// Setup metrics exporter(s) dựa trên mode
+	if cfg.IsPull() {
+		// Pull mode: Prometheus exporter
+		promExporter, err := prometheus.New()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create prometheus exporter: %w", err)
+		}
+		readers = append(readers, promExporter)
+
+		// Setup HTTP server cho pull metrics
+		mux := http.NewServeMux()
+		mux.Handle(cfg.MetricsPath, promhttp.Handler())
+
+		metricsServer = &http.Server{
+			Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.MetricsPort),
+			Handler: mux,
+		}
+
+		go func() {
+			if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				fmt.Printf("Metrics server error: %v\n", err)
+			}
+		}()
 	}
 
-	mp := sdkmetric.NewMeterProvider(
+	if cfg.IsPush() {
+		// Push mode: OTLP metrics exporter
+		pushInterval := time.Duration(cfg.MetricsPushInterval) * time.Second
+		otlpMetricsExp, err := otlpmetrichttp.New(ctx,
+			otlpmetrichttp.WithEndpoint(cfg.MetricsPushEndpoint),
+			otlpmetrichttp.WithInsecure(),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create OTLP metrics exporter: %w", err)
+		}
+
+		reader := sdkmetric.NewPeriodicReader(otlpMetricsExp,
+			sdkmetric.WithInterval(pushInterval),
+		)
+		metricsShutdown = append(metricsShutdown, reader.Shutdown)
+		readers = append(readers, reader)
+	}
+
+	// If no readers configured, default to pull mode
+	if len(readers) == 0 {
+		promExporter, err := prometheus.New()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create prometheus exporter: %w", err)
+		}
+		readers = append(readers, promExporter)
+
+		mux := http.NewServeMux()
+		mux.Handle(cfg.MetricsPath, promhttp.Handler())
+
+		metricsServer = &http.Server{
+			Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.MetricsPort),
+			Handler: mux,
+		}
+
+		go func() {
+			if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				fmt.Printf("Metrics server error: %v\n", err)
+			}
+		}()
+	}
+
+	// Create MeterProvider with all readers
+	opts := []sdkmetric.Option{
 		sdkmetric.WithResource(res),
-		sdkmetric.WithReader(promExporter),
-	)
+	}
+	for _, r := range readers {
+		opts = append(opts, sdkmetric.WithReader(r))
+	}
+	mp = sdkmetric.NewMeterProvider(opts...)
 	otel.SetMeterProvider(mp)
 
-	// 4. Khởi tạo HTTP Server nội bộ để phục vụ Prometheus Scraping
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
-
-	metricsServer := &http.Server{
-		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.MetricsPort), // Listen on all interfaces
-		Handler: mux,
-	}
-
-	// Chạy Metrics Server trong goroutine riêng
-	go func() {
-		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("Metrics server error: %v\n", err)
-		}
-	}()
-
-	// 5. Cấu hình Global Propagator (W3C Trace Context & Baggage)
+	// 4. Cấu hình Global Propagator (W3C Trace Context & Baggage)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
@@ -88,9 +146,11 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 	return func(ctx context.Context) error {
 		var errs []string
 
-		// Shutdown Metrics Server
-		if err := metricsServer.Shutdown(ctx); err != nil {
-			errs = append(errs, fmt.Sprintf("metrics server shutdown error: %v", err))
+		// Shutdown Metrics Server (if pull mode enabled)
+		if metricsServer != nil {
+			if err := metricsServer.Shutdown(ctx); err != nil {
+				errs = append(errs, fmt.Sprintf("metrics server shutdown error: %v", err))
+			}
 		}
 
 		// Shutdown Tracer Provider
@@ -101,6 +161,13 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 		// Shutdown Meter Provider
 		if err := mp.Shutdown(ctx); err != nil {
 			errs = append(errs, fmt.Sprintf("meter provider shutdown error: %v", err))
+		}
+
+		// Shutdown push-specific resources
+		for _, shutdown := range metricsShutdown {
+			if err := shutdown(ctx); err != nil {
+				errs = append(errs, fmt.Sprintf("push metrics shutdown error: %v", err))
+			}
 		}
 
 		if len(errs) > 0 {
