@@ -15,8 +15,8 @@ env:
   CI: true
 
 jobs:
-  integration-checks:
-    name: Integration Checks
+  checks:
+    name: Checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -55,6 +55,13 @@ jobs:
           name: coverage-out
           path: coverage.out
 
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Run E2E tests
         run: bash e2e/run-e2e.sh
 
@@ -63,7 +70,7 @@ jobs:
     # googleapis/release-please-action. Uses a GitHub App token generated
     # earlier in the steps to allow write access for tagging/release creation.
     name: Release
-    needs: [integration-checks]
+    needs: [checks, e2e-tests]
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     permissions:
@@ -93,7 +100,7 @@ jobs:
     # Reporting job: always runs (even if previous jobs are skipped/failed)
     # and sets a GitHub status via an external action.
     name: Report
-    needs: [integration-checks, release]
+    needs: [checks, e2e-tests, release]
     runs-on: ubuntu-slim
     if: ${{ always() }}
     steps:
@@ -102,32 +109,33 @@ jobs:
         with:
           authToken: ${{secrets.GITHUB_TOKEN}}
           context: ci-completed
-          state: ${{ (needs.integration-checks.result != 'failure' && needs.release.result != 'failure') && 'success' || 'failure' }}
+          state: ${{ (needs.checks.result != 'failure' && needs.e2e-tests.result != 'failure' && needs.release.result != 'failure') && 'success' || 'failure' }}
           sha: ${{github.event.pull_request.head.sha || github.sha}}
 
       # Coverage upload: only run when integration-checks succeeded
       - name: Checkout
+        if: ${{ needs.checks.result == 'success' && needs.e2e-tests.result == 'success' }}
         uses: actions/checkout@v5
 
       - name: Download coverage artifact
-        if: ${{ needs.integration-checks.result == 'success' }}
+        if: ${{ needs.checks.result == 'success' && needs.e2e-tests.result == 'success' }}
         uses: actions/download-artifact@v4
         with:
           name: coverage-out
           path: .
 
       - name: Set up Go (for coverage upload)
-        if: ${{ needs.integration-checks.result == 'success' }}
+        if: ${{ needs.checks.result == 'success' && needs.e2e-tests.result == 'success' }}
         uses: actions/setup-go@v6
         with:
           go-version: stable
 
       - name: Install goveralls
-        if: ${{ needs.integration-checks.result == 'success' }}
+        if: ${{ needs.checks.result == 'success' && needs.e2e-tests.result == 'success' }}
         run: go install github.com/mattn/goveralls@latest
 
       - name: Upload to Coveralls
-        if: ${{ needs.integration-checks.result == 'success' }}
+        if: ${{ needs.checks.result == 'success' && needs.e2e-tests.result == 'success' }}
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         run: |
