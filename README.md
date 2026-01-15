@@ -28,7 +28,9 @@ go-observability provides a compact, opinionated set of helpers for:
 Comprehensive documentation and examples are published in the `docs/` folder and the project site:
 
 - Docs folder: [docs/index.md](docs/index.md)
-- Local preview: run `task docs-serve` (see `Taskfile.yml`)
+- Document site:
+  [https://ecoma-io.github.io/go-observability](https://ecoma-io.github.io/go-observability/)
+- Local preview: run `task docs:serve` (see `Taskfile.yml`)
 
 ## Quick start
 
