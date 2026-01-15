@@ -624,6 +624,12 @@ metrics.</p>
 go<span class="w"> </span>run<span class="w"> </span>main.go
 </code></pre></div>
 
+<p>For local dev with a non-TLS collector set:</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_INSECURE</span><span class="o">=</span><span class="nb">true</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">METRICS_INSECURE</span><span class="o">=</span><span class="nb">true</span><span class="w">   </span><span class="c1"># if using push exporters against a non-TLS collector</span>
+go<span class="w"> </span>run<span class="w"> </span>main.go
+</code></pre></div>
+
 <p>Key endpoints:</p>
 <ul>
 <li><code>GET /ping</code> — tracked</li>
@@ -639,6 +645,11 @@ go<span class="w"> </span>run<span class="w"> </span>main.go
 <span class="nb">export</span><span class="w"> </span><span class="nv">PORT</span><span class="o">=</span><span class="m">8080</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">METRICS_PORT</span><span class="o">=</span><span class="m">9090</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_ENDPOINT</span><span class="o">=</span>localhost:4318
+go<span class="w"> </span>run<span class="w"> </span>examples/gin-service/main.go
+</code></pre></div>
+
+<p>Local-dev tip:</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_INSECURE</span><span class="o">=</span><span class="nb">true</span>
 go<span class="w"> </span>run<span class="w"> </span>examples/gin-service/main.go
 </code></pre></div>
 
@@ -659,6 +670,12 @@ curl<span class="w"> </span>http://localhost:8080/error
 go<span class="w"> </span>run<span class="w"> </span>main.go
 </code></pre></div>
 
+<p>If your OTLP collector is running without TLS locally:</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_INSECURE</span><span class="o">=</span><span class="nb">true</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">METRICS_INSECURE</span><span class="o">=</span><span class="nb">true</span>
+go<span class="w"> </span>run<span class="w"> </span>main.go
+</code></pre></div>
+
 <p>Test with <code>grpcurl</code>:</p>
 <div class="codehilite"><pre><span></span><code>grpcurl<span class="w"> </span>-plaintext<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;name&quot;:&quot;World&quot;}&#39;</span><span class="w"> </span>localhost:50051<span class="w"> </span>hello.HelloService/SayHello
 grpcurl<span class="w"> </span>-plaintext<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;name&quot;:&quot;Stream&quot;}&#39;</span><span class="w"> </span>localhost:50051<span class="w"> </span>hello.HelloService/SayHelloStream
@@ -671,6 +688,11 @@ grpcurl<span class="w"> </span>-plaintext<span class="w"> </span>-d<span class="
 <span class="nb">export</span><span class="w"> </span><span class="nv">PORT</span><span class="o">=</span><span class="m">8080</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">METRICS_PORT</span><span class="o">=</span><span class="m">9090</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_ENDPOINT</span><span class="o">=</span>localhost:4318
+go<span class="w"> </span>run<span class="w"> </span>examples/simple-service/main.go
+</code></pre></div>
+
+<p>Local dev:</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">OTEL_INSECURE</span><span class="o">=</span><span class="nb">true</span>
 go<span class="w"> </span>run<span class="w"> </span>examples/simple-service/main.go
 </code></pre></div>
 

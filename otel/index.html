@@ -434,6 +434,39 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#insecure-tls-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Insecure / TLS configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metrics-protocol-and-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metrics protocol and defaults
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shutdown-ordering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shutdown ordering
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -618,6 +651,28 @@ graceful shutdown).</p>
 <li>Ensure <code>METRICS_PUSH_ENDPOINT</code> is reachable from the runtime environment when using
   <code>push</code>/<code>hybrid</code> modes.</li>
 </ul>
+<h2 id="insecure-tls-configuration">Insecure / TLS configuration<a class="headerlink" href="#insecure-tls-configuration" title="Permanent link">&para;</a></h2>
+<p>For local development and tests it is common to run collectors without TLS. <code>InitOtel</code> now respects
+two boolean config flags (and corresponding environment variables) to allow connecting to OTLP
+endpoints without TLS:</p>
+<ul>
+<li><code>OTEL_INSECURE</code> — when <code>true</code>, the OTLP trace exporter will use an insecure (non-TLS) connection
+  to <code>OTEL_ENDPOINT</code>.</li>
+<li><code>METRICS_INSECURE</code> — when <code>true</code>, OTLP metrics exporters (HTTP or gRPC) use insecure connections
+  to <code>METRICS_PUSH_ENDPOINT</code>.</li>
+</ul>
+<p>Set these to <code>true</code> only for local/dev/e2e environments. For production deployments prefer TLS
+and/or mTLS and validate certificates.</p>
+<h2 id="metrics-protocol-and-defaults">Metrics protocol and defaults<a class="headerlink" href="#metrics-protocol-and-defaults" title="Permanent link">&para;</a></h2>
+<p>The <code>METRICS_PROTOCOL</code> config controls how metrics are pushed when using <code>push</code> or <code>hybrid</code> mode.
+Supported values are <code>http</code> and <code>grpc</code>. When the value is empty the implementation defaults to
+<code>http</code> for backwards compatibility.</p>
+<h2 id="shutdown-ordering">Shutdown ordering<a class="headerlink" href="#shutdown-ordering" title="Permanent link">&para;</a></h2>
+<p>The shutdown function returned by <code>InitOtel</code> performs orderly teardown to avoid data loss or
+goroutine leaks. It first shuts down any push-specific readers (periodic readers), then
+force-flushes the MeterProvider and TracerProvider, shuts down the pull metrics HTTP server (if
+active), and finally shuts down the tracer and meter providers. This ordering ensures periodic
+readers can flush their data before providers are torn down.</p>
 
 
 
