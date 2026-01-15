@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/ecoma-io/go-observability/compare/v1.3.0...v1.4.0) (2026-01-15)
+
+
+### Features
+
+* bind metrics server port immediately to handle startup failures ([de1e085](https://github.com/ecoma-io/go-observability/commit/de1e0857998f3e27769a74f26e49fdff814267f9))
+* validate METRICS_PORT range  is a valid port (1-65535) ([6b03f86](https://github.com/ecoma-io/go-observability/commit/6b03f867ec80660644cb803849567ff22649aa9d))
+
 ## [1.3.0](https://github.com/ecoma-io/go-observability/compare/v1.2.1...v1.3.0) (2026-01-14)
 
 
