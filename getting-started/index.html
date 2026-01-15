@@ -270,6 +270,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -286,6 +304,102 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#basic-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Basic usage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-variables-build-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment variables &amp; build metadata
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running examples
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metrics-tracing-at-runtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metrics &amp; Tracing at runtime
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to go next
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -501,17 +615,94 @@
 
 
 <h1 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h1>
-<p>Quickstart (local):</p>
-<p>Install dependencies and run docs preview:</p>
-<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
-mkdocs<span class="w"> </span>serve<span class="w"> </span>-a<span class="w"> </span><span class="m">0</span>.0.0.0:8000
+<p>This page shows how to install and use the <code>go-observability</code> library in a Go service (installation,
+basic initialization, and runtime usage). It is intended for service owners who want to add logging,
+tracing, and metrics — not for editing the library itself.</p>
+<h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
+<p>Add the module to your project:</p>
+<div class="codehilite"><pre><span></span><code>go<span class="w"> </span>get<span class="w"> </span>github.com/ecoma-io/go-observability
 </code></pre></div>
 
-<p>Run an example service (from repository root):</p>
-<div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>examples/gin-service
-go<span class="w"> </span>run<span class="w"> </span>main.go
-<span class="c1"># Metrics available at http://localhost:9090/metrics (if OTEL in pull mode)</span>
+<p>Or add it to your <code>go.mod</code> and run <code>go mod tidy</code>.</p>
+<h2 id="basic-usage">Basic usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Embed <code>BaseConfig</code> into your service config and load configuration (env/ldflags):</li>
+</ol>
+<div class="codehilite"><pre><span></span><code><span class="kd">type</span><span class="w"> </span><span class="nx">Config</span><span class="w"> </span><span class="kd">struct</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">observability</span><span class="p">.</span><span class="nx">BaseConfig</span>
+<span class="w">    </span><span class="c1">// your service-specific fields</span>
+<span class="p">}</span>
+
+<span class="kd">var</span><span class="w"> </span><span class="nx">cfg</span><span class="w"> </span><span class="nx">Config</span>
+<span class="nx">observability</span><span class="p">.</span><span class="nx">LoadCfg</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">cfg</span><span class="p">)</span>
 </code></pre></div>
+
+<ol>
+<li>Create a logger and initialize OpenTelemetry:</li>
+</ol>
+<div class="codehilite"><pre><span></span><code><span class="nx">logger</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">observability</span><span class="p">.</span><span class="nx">NewLogger</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">cfg</span><span class="p">.</span><span class="nx">BaseConfig</span><span class="p">)</span>
+<span class="k">defer</span><span class="w"> </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Sync</span><span class="p">()</span>
+
+<span class="nx">shutdown</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">observability</span><span class="p">.</span><span class="nx">InitOtel</span><span class="p">(</span><span class="nx">cfg</span><span class="p">.</span><span class="nx">BaseConfig</span><span class="p">)</span>
+<span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">logger</span><span class="p">.</span><span class="nx">Fatal</span><span class="p">(</span><span class="s">&quot;failed to init otel&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;error&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<span class="p">}</span>
+<span class="k">defer</span><span class="w"> </span><span class="nx">shutdown</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nx">Background</span><span class="p">())</span>
+</code></pre></div>
+
+<ol>
+<li>Attach middleware or gRPC interceptors:</li>
+</ol>
+<div class="codehilite"><pre><span></span><code><span class="c1">// Gin HTTP</span>
+<span class="nx">router</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">gin</span><span class="p">.</span><span class="nx">New</span><span class="p">()</span>
+<span class="k">for</span><span class="w"> </span><span class="nx">_</span><span class="p">,</span><span class="w"> </span><span class="nx">mw</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">range</span><span class="w"> </span><span class="nx">observability</span><span class="p">.</span><span class="nx">GinMiddlewareWithConfig</span><span class="p">(</span><span class="nx">logger</span><span class="p">,</span><span class="w"> </span><span class="nx">cfg</span><span class="p">.</span><span class="nx">ServiceName</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">router</span><span class="p">.</span><span class="nx">Use</span><span class="p">(</span><span class="nx">mw</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="c1">// gRPC server</span>
+<span class="nx">srv</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">grpc</span><span class="p">.</span><span class="nx">NewServer</span><span class="p">(</span>
+<span class="w">    </span><span class="nx">grpc</span><span class="p">.</span><span class="nx">UnaryInterceptor</span><span class="p">(</span><span class="nx">observability</span><span class="p">.</span><span class="nx">GrpcUnaryServerInterceptor</span><span class="p">(</span><span class="nx">logger</span><span class="p">)),</span>
+<span class="p">)</span>
+</code></pre></div>
+
+<h2 id="environment-variables-build-metadata">Environment variables &amp; build metadata<a class="headerlink" href="#environment-variables-build-metadata" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The library reads configuration from environment variables and supports build-time metadata via
+  <code>-ldflags</code>.</li>
+<li>Common env vars: <code>LOG_LEVEL</code>, <code>OTEL_ENDPOINT</code>, <code>OTEL_TRACING_SAMPLE_RATE</code> (see <code>config.go</code> for
+  full list).</li>
+<li>Inject service metadata at build time:</li>
+</ul>
+<div class="codehilite"><pre><span></span><code>go<span class="w"> </span>build<span class="w"> </span>-ldflags<span class="w"> </span><span class="s2">&quot;-X github.com/ecoma-io/go-observability.ServiceName=my-service -X github.com/ecoma-io/go-observability.Version=v1.2.3&quot;</span>
+</code></pre></div>
+
+<h2 id="running-examples">Running examples<a class="headerlink" href="#running-examples" title="Permanent link">&para;</a></h2>
+<p>Examples are included under <code>examples/</code>. To run the Gin example locally:</p>
+<div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>examples/gin-service
+<span class="nv">SERVICE_NAME</span><span class="o">=</span>my-gin-service<span class="w"> </span><span class="nv">LOG_LEVEL</span><span class="o">=</span>debug<span class="w"> </span>go<span class="w"> </span>run<span class="w"> </span>main.go
+<span class="c1"># Metrics (pull mode) typically available at http://localhost:9090/metrics</span>
+</code></pre></div>
+
+<h2 id="metrics-tracing-at-runtime">Metrics &amp; Tracing at runtime<a class="headerlink" href="#metrics-tracing-at-runtime" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Metrics: When configured in pull mode, a Prometheus scrape endpoint is exposed (default
+  <code>:9090/metrics</code> for examples). When push mode is used, metrics are sent to the OTLP endpoint.</li>
+<li>Traces: Sent to the configured OTLP collector (<code>OTEL_ENDPOINT</code>) or visible through your tracing
+  backend.</li>
+</ul>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Missing traces or metrics usually mean the OTEL collector or endpoint is not reachable. Verify
+  <code>OTEL_ENDPOINT</code> and network connectivity.</li>
+<li>If logs are not appearing, ensure <code>LOG_LEVEL</code> is set appropriately and your service calls
+  <code>logger.Sync()</code> on shutdown.</li>
+</ul>
+<h2 id="where-to-go-next">Where to go next<a class="headerlink" href="#where-to-go-next" title="Permanent link">&para;</a></h2>
+<ul>
+<li>API reference and integration details: see the <code>docs/</code> directory for <code>gin-middleware.md.md</code>,
+  <code>grpc.md</code>, and <code>otel.md</code>.</li>
+<li>For development and contributions, see the repository README and CONTRIBUTING.md.</li>
+</ul>
 
 
 
