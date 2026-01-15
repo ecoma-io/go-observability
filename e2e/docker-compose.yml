@@ -17,6 +17,7 @@ services:
       - PORT=8080
       - METRICS_PORT=9090
       - OTEL_ENDPOINT=otel-collector:4318
+      - OTEL_INSECURE=true
       - LOG_LEVEL=info
     depends_on:
       - otel-collector
@@ -41,6 +42,7 @@ services:
       - PORT=8080
       - METRICS_PORT=9090
       - OTEL_ENDPOINT=otel-collector:4318
+      - OTEL_INSECURE=true
       - LOG_LEVEL=info
     depends_on:
       - otel-collector
@@ -67,6 +69,7 @@ services:
       - HEALTH_PORT=8080
       - METRICS_PORT=9090
       - OTEL_ENDPOINT=otel-collector:4318
+      - OTEL_INSECURE=true
       - LOG_LEVEL=info
     depends_on:
       - otel-collector
@@ -128,6 +131,8 @@ services:
       - METRICS_PUSH_ENDPOINT=otel-collector:4318
       - METRICS_PUSH_INTERVAL=30
       - OTEL_ENDPOINT=otel-collector:4318
+      - OTEL_INSECURE=true
+      - METRICS_INSECURE=true
       - LOG_LEVEL=info
     depends_on:
       - otel-collector
@@ -156,6 +161,8 @@ services:
       - METRICS_PUSH_ENDPOINT=otel-collector:4318
       - METRICS_PUSH_INTERVAL=30
       - OTEL_ENDPOINT=otel-collector:4318
+      - OTEL_INSECURE=true
+      - METRICS_INSECURE=true
       - LOG_LEVEL=info
     depends_on:
       - otel-collector
@@ -182,6 +189,8 @@ services:
       - METRICS_PROTOCOL=grpc
       - METRICS_PUSH_INTERVAL=30
       - OTEL_ENDPOINT=otel-collector:4318
+      - OTEL_INSECURE=true
+      - METRICS_INSECURE=true
       - LOG_LEVEL=info
     depends_on:
       - otel-collector
@@ -211,6 +220,8 @@ services:
       - METRICS_PROTOCOL=grpc
       - METRICS_PUSH_INTERVAL=30
       - OTEL_ENDPOINT=otel-collector:4318
+      - OTEL_INSECURE=true
+      - METRICS_INSECURE=true
       - LOG_LEVEL=info
     depends_on:
       - otel-collector

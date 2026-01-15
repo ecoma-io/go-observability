@@ -18,6 +18,8 @@ func TestInitOtel(t *testing.T) {
 		MetricsPort:           19090, // Test port
 		MetricsMode:           "pull",
 		MetricsPath:           "/metrics",
+		OtelInsecure:          true,
+		MetricsInsecure:       true,
 	}
 
 	t.Run("Init Success with Pull Mode", func(t *testing.T) {

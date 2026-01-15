@@ -28,6 +28,8 @@ type BaseConfig struct {
 	MetricsPushEndpoint      string  `env:"METRICS_PUSH_ENDPOINT"`
 	MetricsPushInterval      int     `env:"METRICS_PUSH_INTERVAL" env-default:"30"`
 	MetricsProtocol          string  `env:"METRICS_PROTOCOL" env-default:"http"`
+	OtelInsecure             bool    `env:"OTEL_INSECURE" env-default:"false"`
+	MetricsInsecure          bool    `env:"METRICS_INSECURE" env-default:"false"`
 }
 
 

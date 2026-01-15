@@ -40,10 +40,14 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 	}
 
 	// 2. Configure Tracing (Push model sending to Otel Collector)
-	traceExp, err := otlptracehttp.New(ctx,
+	// Build options for trace exporter, respecting insecure config
+	traceOpts := []otlptracehttp.Option{
 		otlptracehttp.WithEndpoint(cfg.OtelEndpoint),
-		otlptracehttp.WithInsecure(),
-	)
+	}
+	if cfg.OtelInsecure {
+		traceOpts = append(traceOpts, otlptracehttp.WithInsecure())
+	}
+	traceExp, err := otlptracehttp.New(ctx, traceOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create trace exporter: %w", err)
 	}
@@ -101,18 +105,24 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 		
 		// Create OTLP metric exporter based on protocol configuration
 		protocol := strings.ToLower(strings.TrimSpace(cfg.MetricsProtocol))
-		
+		if protocol == "" {
+			protocol = "http"
+		}
+
 		switch protocol {
 		case "grpc":
 			// Use gRPC protocol for OTLP metrics export
-			exp, err := otlpmetricgrpc.New(ctx,
+			grpcOpts := []otlpmetricgrpc.Option{
 				otlpmetricgrpc.WithEndpoint(cfg.MetricsPushEndpoint),
-				otlpmetricgrpc.WithInsecure(),
-			)
+			}
+			if cfg.MetricsInsecure {
+				grpcOpts = append(grpcOpts, otlpmetricgrpc.WithInsecure())
+			}
+			exp, err := otlpmetricgrpc.New(ctx, grpcOpts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create OTLP gRPC metrics exporter: %w", err)
 			}
-			
+
 			reader := sdkmetric.NewPeriodicReader(exp,
 				sdkmetric.WithInterval(pushInterval),
 			)
@@ -120,22 +130,24 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 			readers = append(readers, reader)
 		case "http":
 			// Use HTTP protocol for OTLP metrics export
-			fallthrough
-		default:
-			// Default to HTTP if protocol not specified
-			exp, err := otlpmetrichttp.New(ctx,
+			httpOpts := []otlpmetrichttp.Option{
 				otlpmetrichttp.WithEndpoint(cfg.MetricsPushEndpoint),
-				otlpmetrichttp.WithInsecure(),
-			)
+			}
+			if cfg.MetricsInsecure {
+				httpOpts = append(httpOpts, otlpmetrichttp.WithInsecure())
+			}
+			exp, err := otlpmetrichttp.New(ctx, httpOpts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create OTLP HTTP metrics exporter: %w", err)
 			}
-			
+
 			reader := sdkmetric.NewPeriodicReader(exp,
 				sdkmetric.WithInterval(pushInterval),
 			)
 			metricsShutdown = append(metricsShutdown, reader.Shutdown)
 			readers = append(readers, reader)
+		default:
+			return nil, fmt.Errorf("invalid METRICS_PROTOCOL: %s", protocol)
 		}
 	}
 
@@ -189,8 +201,14 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 	return func(ctx context.Context) error {
 		var errs []string
 
+		// Shutdown push-specific resources (readers/periodic readers) first
+		for _, shutdown := range metricsShutdown {
+			if err := shutdown(ctx); err != nil {
+				errs = append(errs, fmt.Sprintf("push metrics shutdown error: %v", err))
+			}
+		}
+
 		// ForceFlush Meter Provider to ensure all metrics are sent before shutdown
-		// This is especially important for short-lived jobs and batch processes
 		if err := mp.ForceFlush(ctx); err != nil {
 			errs = append(errs, fmt.Sprintf("meter provider force flush error: %v", err))
 		}
@@ -215,13 +233,6 @@ func InitOtel(cfg BaseConfig) (func(context.Context) error, error) {
 		// Shutdown Meter Provider
 		if err := mp.Shutdown(ctx); err != nil {
 			errs = append(errs, fmt.Sprintf("meter provider shutdown error: %v", err))
-		}
-
-		// Shutdown push-specific resources
-		for _, shutdown := range metricsShutdown {
-			if err := shutdown(ctx); err != nil {
-				errs = append(errs, fmt.Sprintf("push metrics shutdown error: %v", err))
-			}
 		}
 
 		if len(errs) > 0 {
