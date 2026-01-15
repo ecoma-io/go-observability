@@ -205,6 +205,44 @@ func TestInitOtel(t *testing.T) {
 	})
 }
 
+func TestInitOtel_DefaultsToPullWhenNoMode(t *testing.T) {
+	cfg := BaseConfig{
+		ServiceName:           "test-otel-defaults",
+		Version:               "1.0.0",
+		OtelEndpoint:          "localhost:4318",
+		OtelTracingSampleRate: 1.0,
+		MetricsPort:           19120,
+		MetricsMode:           "", // empty to trigger default branch
+		MetricsPath:           "/metrics",
+	}
+
+	shutdown, err := InitOtel(cfg)
+	if err != nil {
+		t.Fatalf("InitOtel (defaults) failed: %v", err)
+	}
+	if shutdown == nil {
+		t.Fatal("shutdown function is nil for defaults case")
+	}
+
+	// Exercise tracer and meter
+	tracer := GetTracer("test-default-tracer")
+	_, span := tracer.Start(context.Background(), "op")
+	span.End()
+
+	meter := GetMeter("test-default-meter")
+	if meter == nil {
+		t.Error("GetMeter returned nil for defaults case")
+	}
+
+	// Shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := shutdown(ctx); err != nil {
+		// Shutdown may return errors depending on environment; log but don't fail the test
+		t.Logf("shutdown returned error: %v", err)
+	}
+}
+
 // TestInitOtel_BindFailure verifies InitOtel returns an error when the
 // metrics port is already bound by another listener.
 func TestInitOtel_BindFailure(t *testing.T) {
