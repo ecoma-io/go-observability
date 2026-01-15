@@ -19,6 +19,13 @@ export OTEL_ENDPOINT=localhost:4318
 go run main.go
 ```
 
+Local dev (non-TLS collector):
+
+```bash
+export OTEL_INSECURE=true
+go run main.go
+```
+
 ## Testing
 
 ```bash

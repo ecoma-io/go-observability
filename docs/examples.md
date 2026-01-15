@@ -35,6 +35,14 @@ cd examples/gin-example
 go run main.go
 ```
 
+For local dev with a non-TLS collector set:
+
+```bash
+export OTEL_INSECURE=true
+export METRICS_INSECURE=true   # if using push exporters against a non-TLS collector
+go run main.go
+```
+
 Key endpoints:
 
 - `GET /ping` — tracked
@@ -55,6 +63,13 @@ export SERVICE_NAME=gin-service
 export PORT=8080
 export METRICS_PORT=9090
 export OTEL_ENDPOINT=localhost:4318
+go run examples/gin-service/main.go
+```
+
+Local-dev tip:
+
+```bash
+export OTEL_INSECURE=true
 go run examples/gin-service/main.go
 ```
 
@@ -81,6 +96,14 @@ cd examples/grpc-service
 go run main.go
 ```
 
+If your OTLP collector is running without TLS locally:
+
+```bash
+export OTEL_INSECURE=true
+export METRICS_INSECURE=true
+go run main.go
+```
+
 Test with `grpcurl`:
 
 ```bash
@@ -99,6 +122,13 @@ export SERVICE_NAME=simple-service
 export PORT=8080
 export METRICS_PORT=9090
 export OTEL_ENDPOINT=localhost:4318
+go run examples/simple-service/main.go
+```
+
+Local dev:
+
+```bash
+export OTEL_INSECURE=true
 go run examples/simple-service/main.go
 ```
 

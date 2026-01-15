@@ -54,3 +54,31 @@ graceful shutdown).
   `observability.Logger` to keep logs consistent.
 - Ensure `METRICS_PUSH_ENDPOINT` is reachable from the runtime environment when using
   `push`/`hybrid` modes.
+
+## Insecure / TLS configuration
+
+For local development and tests it is common to run collectors without TLS. `InitOtel` now respects
+two boolean config flags (and corresponding environment variables) to allow connecting to OTLP
+endpoints without TLS:
+
+- `OTEL_INSECURE` — when `true`, the OTLP trace exporter will use an insecure (non-TLS) connection
+  to `OTEL_ENDPOINT`.
+- `METRICS_INSECURE` — when `true`, OTLP metrics exporters (HTTP or gRPC) use insecure connections
+  to `METRICS_PUSH_ENDPOINT`.
+
+Set these to `true` only for local/dev/e2e environments. For production deployments prefer TLS
+and/or mTLS and validate certificates.
+
+## Metrics protocol and defaults
+
+The `METRICS_PROTOCOL` config controls how metrics are pushed when using `push` or `hybrid` mode.
+Supported values are `http` and `grpc`. When the value is empty the implementation defaults to
+`http` for backwards compatibility.
+
+## Shutdown ordering
+
+The shutdown function returned by `InitOtel` performs orderly teardown to avoid data loss or
+goroutine leaks. It first shuts down any push-specific readers (periodic readers), then
+force-flushes the MeterProvider and TracerProvider, shuts down the pull metrics HTTP server (if
+active), and finally shuts down the tracer and meter providers. This ordering ensures periodic
+readers can flush their data before providers are torn down.

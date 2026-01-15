@@ -38,6 +38,9 @@ Install the library and use it in your service by embedding `observability.BaseC
 `observability.LoadCfg`, `observability.NewLogger` and `observability.InitOtel` during startup. See
 full examples in the `examples/` directory.
 
+Note: For local development or e2e you can disable TLS when talking to a local collector by setting
+`OTEL_INSECURE=true` and `METRICS_INSECURE=true` (only for non-production use).
+
 ## Examples
 
 Hands-on examples are available under `examples/`:

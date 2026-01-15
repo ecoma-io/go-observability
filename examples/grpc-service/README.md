@@ -25,6 +25,13 @@ export PORT=50051
 export HEALTH_PORT=8080
 ```
 
+If running a local (non-TLS) collector:
+
+```bash
+export OTEL_INSECURE=true
+export METRICS_INSECURE=true
+```
+
 ### 2. Run the service
 
 ```bash

@@ -24,6 +24,13 @@ export METRICS_PORT=9090
 export PORT=8080
 ```
 
+For local development with a non-TLS collector:
+
+```bash
+export OTEL_INSECURE=true
+export METRICS_INSECURE=true
+```
+
 ### 2. Run the service
 
 ```bash
