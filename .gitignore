@@ -13,6 +13,9 @@
 coverage.txt
 coverage.html
 
+# env files
+.env
+
 # Go workspace file
 go.work.sum
 
