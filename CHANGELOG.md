@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/ecoma-io/go-observability/compare/v1.4.0...v1.5.0) (2026-01-15)
+
+
+### Features
+
+* add support for insecure OTLP and metrics configurations ([16d3984](https://github.com/ecoma-io/go-observability/commit/16d39841fbcc2abf458518ce86381ffb46b35e8a))
+
 ## [1.4.0](https://github.com/ecoma-io/go-observability/compare/v1.3.0...v1.4.0) (2026-01-15)
 
 
